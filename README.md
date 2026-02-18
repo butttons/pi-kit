@@ -1,55 +1,26 @@
 # pi-kit
 
-Personal extensions, skills, and themes for [pi](https://pi.dev).
+Personal [pi](https://pi.dev) extensions, skills, and themes.
 
-## Setup
+## Extensions
 
-Clone the repo and run the sync script:
+- **context-usage** - Custom footer with model, tokens, cost, context bar, and git branch.
+- **shell-preprocessor** - Expand `$`command`` in prompts before the agent sees them.
+- **handoff** - `/handoff` command to transfer context to a new focused session.
+- **plan-mode** - `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle.
+- **safe-commit** - Prompts for confirmation before git commits.
+- **safe-delete** - Prompts for confirmation before deleting files over 100MB.
+- **dora** - Lifecycle hooks for dora code intelligence CLI.
 
-```bash
-git clone git@github.com:butttons/pi-kit.git
-cd pi-kit
-./sync.sh
-```
+## Skills
 
-This copies everything into `~/.pi/agent/`. Run `/reload` in pi to pick up changes.
+- **cloudflare-api** - Cloudflare developer documentation index for looking up resources.
+- **commit-helper** - Generates conventional commit messages from staged changes.
+- **git-fix** - Diagnoses and fixes diverged git branches.
+- **playwright-cli** - Browser automation command reference for playwright-cli.
+- **pr-helper** - Creates GitHub pull requests via `gh` CLI.
+- **release-helper** - Automates git tags and GitHub releases.
 
-## Structure
+## Themes
 
-```
-extensions/         Global extensions
-  context-usage.ts    Custom footer with model, tokens, cost, context bar
-  dora.ts             Dora code intelligence lifecycle hooks
-  handoff.ts          /handoff command to transfer context to a new session
-  plan-mode/          /plan read-only exploration mode with progress tracking
-  safe-commit.ts      Confirm before git commits
-  safe-delete.ts      Confirm before large file deletions
-  shell-preprocessor.ts  Expand $`command` in prompts
-
-skills/             Global skills
-  cloudflare-api/     Cloudflare developer documentation index
-  commit-helper/      Conventional commit message generation
-  git-fix/            Diagnose and fix diverged git branches
-  playwright-cli/     Browser automation via playwright-cli
-  pr-helper/          GitHub pull request creation
-  release-helper/     Git tag and GitHub release workflow
-
-themes/
-  butttons.json       Catppuccin Mocha-based theme
-```
-
-## Workflow
-
-Edit files locally, then sync:
-
-```bash
-./sync.sh
-```
-
-Commit and push to keep the repo up to date:
-
-```bash
-git add -A && git commit -m "description" && git push
-```
-
-On a new machine, clone and run `./sync.sh`.
+- **butttons** - Catppuccin Mocha-based theme.
