@@ -1,0 +1,20 @@
+{
+	"name": "pi-kit",
+	"version": "1.0.0",
+	"description": "Personal pi extensions, skills, prompts, and themes",
+	"author": "Yash (https://github.com/butttons)",
+	"keywords": [
+		"pi-package"
+	],
+	"pi": {
+		"extensions": [
+			"./extensions"
+		],
+		"skills": [
+			"./skills"
+		],
+		"themes": [
+			"./themes"
+		]
+	}
+}
