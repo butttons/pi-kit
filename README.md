@@ -19,6 +19,7 @@ Personal [pi](https://pi.dev) extensions, skills, and themes.
 - **git-fix** - Diagnoses and fixes diverged git branches.
 - **playwright-cli** - Browser automation command reference for playwright-cli.
 - **pr-helper** - Creates GitHub pull requests via `gh` CLI.
+- **pi-costs** - Analyze pi session costs, token usage, and statistics.
 - **release-helper** - Automates git tags and GitHub releases.
 
 ## Themes
