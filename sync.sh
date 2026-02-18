@@ -9,25 +9,25 @@ TARGET="$HOME/.pi/agent"
 
 # Extensions
 if [ -d "$SCRIPT_DIR/extensions" ]; then
-  rsync -a --delete "$SCRIPT_DIR/extensions/" "$TARGET/extensions/"
+  rsync -a "$SCRIPT_DIR/extensions/" "$TARGET/extensions/"
   echo "Synced extensions"
 fi
 
 # Skills
 if [ -d "$SCRIPT_DIR/skills" ]; then
-  rsync -a --delete "$SCRIPT_DIR/skills/" "$TARGET/skills/"
+  rsync -a "$SCRIPT_DIR/skills/" "$TARGET/skills/"
   echo "Synced skills"
 fi
 
 # Prompts
 if [ -d "$SCRIPT_DIR/prompts" ]; then
-  rsync -a --delete "$SCRIPT_DIR/prompts/" "$TARGET/prompts/"
+  rsync -a "$SCRIPT_DIR/prompts/" "$TARGET/prompts/"
   echo "Synced prompts"
 fi
 
 # Themes
 if [ -d "$SCRIPT_DIR/themes" ]; then
-  rsync -a --delete "$SCRIPT_DIR/themes/" "$TARGET/themes/"
+  rsync -a "$SCRIPT_DIR/themes/" "$TARGET/themes/"
   echo "Synced themes"
 fi
 
