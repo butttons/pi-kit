@@ -11,6 +11,7 @@ Personal [pi](https://pi.dev) extensions, skills, and themes.
 - **safe-commit** - Prompts for confirmation before git commits.
 - **safe-delete** - Prompts for confirmation before deleting files over 100MB.
 - **dora** - Lifecycle hooks for dora code intelligence CLI.
+- **file-tracker** - Tracks files touched in a session with +/- line counts in a tree widget. `/files` command and `Ctrl+Shift+F` toggle.
 
 ## Skills
 
