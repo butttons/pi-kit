@@ -17,7 +17,7 @@ import {
 	isToolCallEventType,
 	isWriteToolResult,
 } from "@mariozechner/pi-coding-agent";
-import { Container, Key, matchesKey, Text } from "@mariozechner/pi-tui";
+import { Container, Key, matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
 
 type FileAction = "read" | "edit" | "write";
 
@@ -257,14 +257,25 @@ const renderTreeLines = ({
 	return lines;
 };
 
+const WIDGET_MAX_FILES = 5;
+
 export default function fileTracker(pi: ExtensionAPI) {
 	let files = new Map<string, FileEntry>();
+	let fileOrder: string[] = []; // tracks touch order, most recent last
 	let cwd = process.cwd();
 
 	// Pending write paths: track paths from tool_call, resolve in tool_result
 	const pendingWrites = new Map<string, string>(); // toolCallId -> path
 	const pendingWriteContents = new Map<string, string>(); // toolCallId -> content
 	const pendingEditPaths = new Map<string, string>(); // toolCallId -> path
+
+	const touchOrder = ({ filePath }: { filePath: string }): void => {
+		const idx = fileOrder.indexOf(filePath);
+		if (idx !== -1) {
+			fileOrder.splice(idx, 1);
+		}
+		fileOrder.push(filePath);
+	};
 
 	const resolvePath = ({ filePath }: { filePath: string }): string => {
 		const cleaned = filePath.startsWith("@") ? filePath.slice(1) : filePath;
@@ -283,6 +294,7 @@ export default function fileTracker(pi: ExtensionAPI) {
 			};
 			files.set(resolved, entry);
 		}
+		touchOrder({ filePath: resolved });
 		return entry;
 	};
 
@@ -295,13 +307,27 @@ export default function fileTracker(pi: ExtensionAPI) {
 		}
 
 		ctx.ui.setWidget("file-tracker", (_tui, theme) => {
-			const tree = buildTree({ files, cwd });
+			// Build a subset of only the latest N files for the widget
+			const recentPaths = fileOrder.slice(-WIDGET_MAX_FILES);
+			const recentFiles = new Map<string, FileEntry>();
+			for (const p of recentPaths) {
+				const entry = files.get(p);
+				if (entry) {
+					recentFiles.set(p, entry);
+				}
+			}
+
+			const tree = buildTree({ files: recentFiles, cwd });
 			const totalAdded = tree.linesAdded;
 			const totalRemoved = tree.linesRemoved;
 
+			const isTruncated = files.size > WIDGET_MAX_FILES;
 			const header =
 				theme.fg("dim", "files: ") +
 				theme.fg("text", `${files.size}`) +
+				(isTruncated
+					? theme.fg("dim", ` (latest ${recentFiles.size})`)
+					: "") +
 				(totalAdded > 0 || totalRemoved > 0
 					? " " +
 						formatStats({
@@ -322,7 +348,10 @@ export default function fileTracker(pi: ExtensionAPI) {
 			const allLines = [header, ...treeLines];
 
 			return {
-				render: () => allLines,
+				render: (width?: number) =>
+					width
+						? allLines.map((line) => truncateToWidth(line, width))
+						: allLines,
 				invalidate: () => {},
 			};
 		});
@@ -330,6 +359,7 @@ export default function fileTracker(pi: ExtensionAPI) {
 
 	const reconstructState = ({ ctx }: { ctx: ExtensionContext }): void => {
 		files = new Map();
+		fileOrder = [];
 		cwd = ctx.cwd;
 
 		for (const entry of ctx.sessionManager.getBranch()) {

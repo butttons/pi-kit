@@ -9,7 +9,7 @@ Personal [pi](https://pi.dev) extensions, skills, and themes.
 - **handoff** - `/handoff` command to transfer context to a new focused session.
 - **plan-mode** - `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle.
 - **safe-commit** - Prompts for confirmation before git commits.
-- **safe-delete** - Prompts for confirmation before deleting files over 100MB.
+- **safe-delete** - Intercepts destructive bash commands: rm on protected/large paths, find -delete, recursive chmod/chown, git clean -fdx, xargs rm, dd to devices, mkfs, mv to /dev/null, sudo escalation, wildcard explosions.
 - **dora** - Lifecycle hooks for dora code intelligence CLI.
 - **file-tracker** - Tracks files touched in a session with +/- line counts in a tree widget. `/files` command and `Ctrl+Shift+F` toggle.
 

@@ -40,9 +40,9 @@ Group changes by area/theme with `###` subheadings. Under each, use bullet point
 
 ## Tests
 
-One line summarizing test counts and coverage areas. Example:
-- CLI: 76 tests across 5 files (11 new)
-- Worker: 107 tests across 11 files
+Describe what was tested, not raw counts. Focus on what test suites were added or changed and why. Example:
+- **CLI**: Search text extractor tests for OpenCode agent
+- **Worker**: OpenCode mapper tests, migrated existing test suites to new data layer utilities
 ```
 
 ### Body rules
@@ -51,7 +51,7 @@ One line summarizing test counts and coverage areas. Example:
 - Use `**bold**` for package/component names in bullet points.
 - Keep bullet points to one sentence each.
 - Do not list every file changed -- summarize by feature.
-- Include test summary if tests were added or changed.
+- Include test summary if tests were added or changed. Describe what was tested, not raw pass counts.
 - If there is a single commit, the body can be minimal (summary + one bullet list).
 
 ## Flags
