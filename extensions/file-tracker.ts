@@ -655,17 +655,6 @@ export default function fileTracker(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerShortcut(Key.ctrlAlt("f"), {
-		description: "Toggle file tracker overlay",
-		handler: async (ctx) => {
-			if (isOverlayActive) {
-				closeOverlay();
-			} else {
-				openOverlay({ ctx });
-			}
-		},
-	});
-
 	// -- Command: /files --
 
 	pi.registerCommand("files", {

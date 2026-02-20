@@ -15,6 +15,7 @@ Personal [pi](https://pi.dev) extensions, skills, and themes.
 - **explore-guard** - Passive guardrail that blocks the agent after consecutive read/explore calls without user input, forcing it to pause and summarize before continuing. `/explore` to bypass for one turn.
 - **auto-commit-nudge** - Nudges the agent to commit after several file writes without a git commit.
 - **run-confirm** - Confirms before expensive bash commands (builds, test suites, generators, deploys, installs).
+- **thinking-stash** - Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.
 - **verbosity-leash** - System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.
 - **tmux-redirect** - Blocks inline long-running processes (dev servers, watchers) and redirects the agent to use tmux.
 
