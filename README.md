@@ -12,7 +12,11 @@ Personal [pi](https://pi.dev) extensions, skills, and themes.
 - **safe-delete** - Intercepts destructive bash commands: rm on protected/large paths, find -delete, recursive chmod/chown, git clean -fdx, xargs rm, dd to devices, mkfs, mv to /dev/null, sudo escalation, wildcard explosions.
 - **dora** - Lifecycle hooks for dora code intelligence CLI.
 - **file-tracker** - Tracks files touched in a session with +/- line counts in a tree widget. `/files` command for full-screen view, overlay always visible.
-- **explore-guard** - Passive guardrail that blocks the agent after consecutive read/explore calls without user input, forcing it to pause and summarize before continuing.
+- **explore-guard** - Passive guardrail that blocks the agent after consecutive read/explore calls without user input, forcing it to pause and summarize before continuing. `/explore` to bypass for one turn.
+- **auto-commit-nudge** - Nudges the agent to commit after several file writes without a git commit.
+- **run-confirm** - Confirms before expensive bash commands (builds, test suites, generators, deploys, installs).
+- **verbosity-leash** - System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.
+- **tmux-redirect** - Blocks inline long-running processes (dev servers, watchers) and redirects the agent to use tmux.
 
 ## Skills
 
