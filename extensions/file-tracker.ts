@@ -2,14 +2,16 @@
  * File Tracker Extension
  *
  * Tracks files touched during a session (read, edited, written) and displays
- * them as a tree widget with +/- line counts. Also provides a /files command
- * for a full-screen view.
+ * them as a tree in a right-side overlay pane with +/- line counts. Also
+ * provides a /files command for a full-screen view. The overlay is always
+ * visible when the terminal is wide enough.
  */
 
 import * as path from "node:path";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
+	Theme,
 } from "@mariozechner/pi-coding-agent";
 import {
 	DynamicBorder,
@@ -17,7 +19,15 @@ import {
 	isToolCallEventType,
 	isWriteToolResult,
 } from "@mariozechner/pi-coding-agent";
-import { Container, Key, matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
+import {
+	Container,
+	Key,
+	matchesKey,
+	Text,
+	truncateToWidth,
+	visibleWidth,
+} from "@mariozechner/pi-tui";
+import type { OverlayHandle, TUI } from "@mariozechner/pi-tui";
 
 type FileAction = "read" | "edit" | "write";
 
@@ -36,6 +46,10 @@ type TreeNode = {
 	linesAdded: number;
 	linesRemoved: number;
 };
+
+const MIN_TERMINAL_WIDTH = 120;
+const PANE_WIDTH_PERCENT = "28%";
+const PANE_MIN_WIDTH = 34;
 
 const parseDiffStats = ({
 	diff,
@@ -127,7 +141,7 @@ const buildTree = ({
 	const collapse = (node: TreeNode): void => {
 		for (const [key, child] of node.children) {
 			if (!child.isFile && child.children.size === 1) {
-				const [grandchildKey, grandchild] = [...child.children.entries()][0]!;
+				const [, grandchild] = [...child.children.entries()][0]!;
 				const merged: TreeNode = {
 					name: child.name + "/" + grandchild.name,
 					isFile: grandchild.isFile,
@@ -156,7 +170,7 @@ const formatStats = ({
 }: {
 	linesAdded: number;
 	linesRemoved: number;
-	theme: { fg: (color: string, text: string) => string };
+	theme: Theme;
 }): string => {
 	const parts: string[] = [];
 	if (linesAdded > 0) {
@@ -173,16 +187,16 @@ const formatActionBadge = ({
 	theme,
 }: {
 	actions: Set<FileAction>;
-	theme: { fg: (color: string, text: string) => string };
+	theme: Theme;
 }): string => {
 	if (actions.has("write") && actions.size === 1) {
-		return theme.fg("accent", "[new]");
+		return theme.fg("accent", "★");
 	}
 	if (actions.has("edit")) {
-		return theme.fg("warning", "[mod]");
+		return theme.fg("warning", "△");
 	}
 	if (actions.has("read") && actions.size === 1) {
-		return theme.fg("dim", "[read]");
+		return theme.fg("dim", "●");
 	}
 	return "";
 };
@@ -198,10 +212,7 @@ const renderTreeLines = ({
 	prefix: string;
 	isLast: boolean;
 	isRoot: boolean;
-	theme: {
-		fg: (color: string, text: string) => string;
-		bold: (text: string) => string;
-	};
+	theme: Theme;
 }): string[] => {
 	const lines: string[] = [];
 
@@ -216,16 +227,16 @@ const renderTreeLines = ({
 				linesRemoved: node.linesRemoved,
 				theme,
 			});
+			if (badge) line += badge + " ";
 			line += theme.fg("text", node.name);
-			if (badge) line += " " + badge;
 			if (stats) line += " " + stats;
 		} else {
-			line += theme.fg("accent", node.name + "/");
 			const stats = formatStats({
 				linesAdded: node.linesAdded,
 				linesRemoved: node.linesRemoved,
 				theme,
 			});
+			line += theme.fg("accent", node.name + "/");
 			if (stats) line += " " + stats;
 		}
 
@@ -257,12 +268,118 @@ const renderTreeLines = ({
 	return lines;
 };
 
-const WIDGET_MAX_FILES = 5;
+// -- Overlay pane component --
+
+class FileTrackerPane {
+	private scrollOffset = 0;
+
+	constructor(
+		private tui: TUI,
+		private theme: Theme,
+		private getState: () => {
+			files: Map<string, FileEntry>;
+			cwd: string;
+		},
+	) {}
+
+	handleInput(data: string): void {
+		if (matchesKey(data, Key.up)) {
+			this.scrollOffset = Math.max(0, this.scrollOffset - 1);
+			this.tui.requestRender();
+		} else if (matchesKey(data, Key.down)) {
+			this.scrollOffset++;
+			this.tui.requestRender();
+		}
+	}
+
+	render(width: number): string[] {
+		const th = this.theme;
+		const innerW = Math.max(1, width - 2);
+		const border = (c: string) => th.fg("border", c);
+		const padLine = (s: string) => truncateToWidth(s, innerW, "...", true);
+
+		const { files, cwd } = this.getState();
+		const lines: string[] = [];
+
+		// Top border with title
+		const title = th.fg("accent", " Files ");
+		const titleW = visibleWidth(title);
+		const leftDash = "─".repeat(1);
+		const rightDash = "─".repeat(Math.max(0, innerW - 1 - titleW));
+		lines.push(border("╭" + leftDash) + title + border(rightDash + "╮"));
+
+		if (files.size === 0) {
+			lines.push(border("│") + padLine(th.fg("dim", " No files touched yet")) + border("│"));
+			lines.push(border("╰" + "─".repeat(innerW) + "╯"));
+			return lines;
+		}
+
+		const tree = buildTree({ files, cwd });
+		const totalAdded = tree.linesAdded;
+		const totalRemoved = tree.linesRemoved;
+
+		// Summary line
+		const summary =
+			" " +
+			th.fg("dim", `${files.size} file${files.size !== 1 ? "s" : ""}`) +
+			(totalAdded > 0 || totalRemoved > 0
+				? " " + formatStats({ linesAdded: totalAdded, linesRemoved: totalRemoved, theme: th })
+				: "");
+		lines.push(border("│") + padLine(summary) + border("│"));
+		lines.push(border("├" + "─".repeat(innerW) + "┤"));
+
+		// Tree lines
+		const treeLines = renderTreeLines({
+			node: tree,
+			prefix: "",
+			isLast: true,
+			isRoot: true,
+			theme: th,
+		});
+
+		// Clamp scroll
+		const maxScroll = Math.max(0, treeLines.length - 1);
+		this.scrollOffset = Math.min(this.scrollOffset, maxScroll);
+
+		const visibleLines = treeLines.slice(this.scrollOffset);
+
+		for (const treeLine of visibleLines) {
+			lines.push(border("│") + padLine(" " + treeLine) + border("│"));
+		}
+
+		// Legend
+		lines.push(border("├" + "─".repeat(innerW) + "┤"));
+		const legend =
+			" " +
+			th.fg("accent", "★") +
+			th.fg("dim", " new ") +
+			th.fg("warning", "△") +
+			th.fg("dim", " mod ") +
+			th.fg("dim", "●") +
+			th.fg("dim", " read");
+		lines.push(border("│") + padLine(legend) + border("│"));
+
+		// Bottom border
+		lines.push(border("╰" + "─".repeat(innerW) + "╯"));
+
+		return lines;
+	}
+
+	invalidate(): void {}
+
+	dispose(): void {}
+}
 
 export default function fileTracker(pi: ExtensionAPI) {
 	let files = new Map<string, FileEntry>();
 	let fileOrder: string[] = []; // tracks touch order, most recent last
 	let cwd = process.cwd();
+
+	// Overlay state
+	let overlayHandle: OverlayHandle | null = null;
+	let isOverlayActive = false;
+	// Store the tui reference from the overlay factory so we can request re-renders
+	let overlayTui: TUI | null = null;
 
 	// Pending write paths: track paths from tool_call, resolve in tool_result
 	const pendingWrites = new Map<string, string>(); // toolCallId -> path
@@ -298,63 +415,49 @@ export default function fileTracker(pi: ExtensionAPI) {
 		return entry;
 	};
 
-	const updateWidget = ({ ctx }: { ctx: ExtensionContext }): void => {
-		if (!ctx.hasUI) return;
-
-		if (files.size === 0) {
-			ctx.ui.setWidget("file-tracker", undefined);
-			return;
+	const requestOverlayRender = (): void => {
+		if (overlayTui && isOverlayActive) {
+			overlayTui.requestRender();
 		}
+	};
 
-		ctx.ui.setWidget("file-tracker", (_tui, theme) => {
-			// Build a subset of only the latest N files for the widget
-			const recentPaths = fileOrder.slice(-WIDGET_MAX_FILES);
-			const recentFiles = new Map<string, FileEntry>();
-			for (const p of recentPaths) {
-				const entry = files.get(p);
-				if (entry) {
-					recentFiles.set(p, entry);
-				}
-			}
+	const openOverlay = ({ ctx }: { ctx: ExtensionContext }): void => {
+		if (!ctx.hasUI || isOverlayActive) return;
 
-			const tree = buildTree({ files: recentFiles, cwd });
-			const totalAdded = tree.linesAdded;
-			const totalRemoved = tree.linesRemoved;
+		isOverlayActive = true;
 
-			const isTruncated = files.size > WIDGET_MAX_FILES;
-			const header =
-				theme.fg("dim", "files: ") +
-				theme.fg("text", `${files.size}`) +
-				(isTruncated
-					? theme.fg("dim", ` (latest ${recentFiles.size})`)
-					: "") +
-				(totalAdded > 0 || totalRemoved > 0
-					? " " +
-						formatStats({
-							linesAdded: totalAdded,
-							linesRemoved: totalRemoved,
-							theme,
-						})
-					: "");
+		// Fire-and-forget: the overlay lives until we call handle.hide()
+		ctx.ui.custom<void>(
+			(tui, theme, _kb, _done) => {
+				overlayTui = tui;
+				return new FileTrackerPane(tui, theme, () => ({
+					files,
+					cwd,
+				}));
+			},
+			{
+				overlay: true,
+				overlayOptions: {
+					anchor: "top-right",
+					width: PANE_WIDTH_PERCENT,
+					minWidth: PANE_MIN_WIDTH,
+					margin: { right: 1, top: 1 },
+					visible: (termWidth: number) => termWidth >= MIN_TERMINAL_WIDTH,
+				},
+				onHandle: (handle: OverlayHandle) => {
+					overlayHandle = handle;
+				},
+			},
+		);
+	};
 
-			const treeLines = renderTreeLines({
-				node: tree,
-				prefix: "",
-				isLast: true,
-				isRoot: true,
-				theme,
-			});
-
-			const allLines = [header, ...treeLines];
-
-			return {
-				render: (width?: number) =>
-					width
-						? allLines.map((line) => truncateToWidth(line, width))
-						: allLines,
-				invalidate: () => {},
-			};
-		});
+	const closeOverlay = (): void => {
+		if (overlayHandle) {
+			overlayHandle.hide();
+			overlayHandle = null;
+		}
+		overlayTui = null;
+		isOverlayActive = false;
 	};
 
 	const reconstructState = ({ ctx }: { ctx: ExtensionContext }): void => {
@@ -467,19 +570,23 @@ export default function fileTracker(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		reconstructState({ ctx });
-		updateWidget({ ctx });
+		closeOverlay();
+		openOverlay({ ctx });
+		requestOverlayRender();
 	});
 
 	pi.on("session_switch", async (_event, ctx) => {
 		reconstructState({ ctx });
-		updateWidget({ ctx });
+		closeOverlay();
+		openOverlay({ ctx });
+		requestOverlayRender();
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
 		if (isToolCallEventType("read", event)) {
 			const fileEntry = getOrCreateEntry({ filePath: event.input.path });
 			fileEntry.actions.add("read");
-			updateWidget({ ctx });
+			requestOverlayRender();
 		}
 
 		if (isToolCallEventType("edit", event)) {
@@ -492,7 +599,7 @@ export default function fileTracker(pi: ExtensionAPI) {
 		}
 	});
 
-	pi.on("tool_result", async (event, ctx) => {
+	pi.on("tool_result", async (event, _ctx) => {
 		if (isEditToolResult(event) && !event.isError) {
 			const filePath = pendingEditPaths.get(event.toolCallId);
 			if (filePath) {
@@ -506,7 +613,7 @@ export default function fileTracker(pi: ExtensionAPI) {
 				}
 
 				pendingEditPaths.delete(event.toolCallId);
-				updateWidget({ ctx });
+				requestOverlayRender();
 			}
 		}
 
@@ -524,9 +631,13 @@ export default function fileTracker(pi: ExtensionAPI) {
 
 				pendingWrites.delete(event.toolCallId);
 				pendingWriteContents.delete(event.toolCallId);
-				updateWidget({ ctx });
+				requestOverlayRender();
 			}
 		}
+	});
+
+	pi.on("session_shutdown", async () => {
+		closeOverlay();
 	});
 
 	// -- Command: /files --
@@ -581,12 +692,12 @@ export default function fileTracker(pi: ExtensionAPI) {
 				// Legend
 				const legend =
 					theme.fg("dim", "  ") +
-					theme.fg("accent", "[new]") +
-					theme.fg("dim", " created  ") +
-					theme.fg("warning", "[mod]") +
-					theme.fg("dim", " edited  ") +
-					theme.fg("dim", "[read]") +
-					theme.fg("dim", " read only");
+					theme.fg("accent", "★") +
+					theme.fg("dim", " new  ") +
+					theme.fg("warning", "△") +
+					theme.fg("dim", " mod  ") +
+					theme.fg("dim", "●") +
+					theme.fg("dim", " read");
 				container.addChild(new Text(legend, 1, 0));
 
 				container.addChild(new Text("", 0, 0));
@@ -611,19 +722,4 @@ export default function fileTracker(pi: ExtensionAPI) {
 		},
 	});
 
-	// -- Shortcut: ctrl+f to toggle widget --
-
-	let isWidgetVisible = true;
-
-	pi.registerShortcut("ctrl+shift+f", {
-		description: "Toggle file tracker widget",
-		handler: async (ctx) => {
-			isWidgetVisible = !isWidgetVisible;
-			if (isWidgetVisible) {
-				updateWidget({ ctx });
-			} else {
-				ctx.ui.setWidget("file-tracker", undefined);
-			}
-		},
-	});
 }
