@@ -12,6 +12,7 @@ Personal [pi](https://pi.dev) extensions, skills, and themes.
 - **safe-delete** - Intercepts destructive bash commands: rm on protected/large paths, find -delete, recursive chmod/chown, git clean -fdx, xargs rm, dd to devices, mkfs, mv to /dev/null, sudo escalation, wildcard explosions.
 - **dora** - Lifecycle hooks for dora code intelligence CLI.
 - **file-tracker** - Tracks files touched in a session with +/- line counts in a tree widget. `/files` command for full-screen view, overlay always visible.
+- **explore-guard** - Passive guardrail that blocks the agent after consecutive read/explore calls without user input, forcing it to pause and summarize before continuing.
 
 ## Skills
 
@@ -22,6 +23,9 @@ Personal [pi](https://pi.dev) extensions, skills, and themes.
 - **pr-helper** - Creates GitHub pull requests via `gh` CLI.
 - **pi-costs** - Analyze pi session costs, token usage, and statistics.
 - **release-helper** - Automates git tags and GitHub releases.
+- **tmux-helper** - Interact with tmux sessions, windows, and panes. Covers capture-pane, send-keys, tmuxinator, and common server management patterns.
+- **wrangler-ops** - Operational patterns for Cloudflare Wrangler CLI: deploy with local configs, D1 migrations, queries, R2 management, type generation.
+- **changeset-helper** - Manage changelogs and versioning with the changesets CLI: creating changesets, consuming for releases, bump types.
 
 ## Themes
 
