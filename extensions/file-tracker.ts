@@ -416,10 +416,19 @@ export default function fileTracker(pi: ExtensionAPI) {
 
 		isOverlayActive = true;
 
+		// Capture the currently focused component before showOverlay steals focus.
+		// The factory runs inside showOverlay, before setFocus is called on the
+		// overlay component, so tui's private focusedComponent still points at the
+		// editor at this point.
+		// eslint-disable-next-line -- accessing private field to restore focus; no public API for passive overlays
+		let previousFocus: unknown = null;
+
 		// Fire-and-forget: the overlay lives until we call handle.hide()
 		ctx.ui.custom<void>(
 			(tui, theme, _kb, _done) => {
 				overlayTui = tui;
+				// biome-ignore lint/suspicious/noExplicitAny: no public API to read focused component
+				previousFocus = (tui as any).focusedComponent ?? null;
 				return new FileTrackerPane(tui, theme, () => ({
 					files,
 					cwd,
@@ -436,6 +445,11 @@ export default function fileTracker(pi: ExtensionAPI) {
 				},
 				onHandle: (handle: OverlayHandle) => {
 					overlayHandle = handle;
+					// Restore focus to the editor so the overlay doesn't capture input.
+					// This overlay is display-only; it should never receive keystrokes.
+					if (overlayTui && previousFocus) {
+						overlayTui.setFocus(previousFocus as Parameters<TUI["setFocus"]>[0]);
+					}
 				},
 			},
 		);
