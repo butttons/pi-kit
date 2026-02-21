@@ -53,7 +53,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **plan-mode**          | `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle. Uses `dora` if available |
 | **handoff**            | `/handoff` command to transfer context to a new focused session.                                                                |
-| **auto-commit-nudge**  | Nudges the agent to commit after several file writes without a git commit.                                                      |
+| **auto-commit-nudge**  | Nudges the agent to commit after several file writes without a git commit. Off by default, `/commit-nudge` to toggle.            |
 | **thinking-stash**     | Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.                 |
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                  |
 | **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                               |
