@@ -63,7 +63,6 @@ After install, run `pi config` to enable/disable individual resources from the T
 | Extension         | Description                                                                                             |
 | ----------------- | ------------------------------------------------------------------------------------------------------- |
 | **context-usage** | Custom footer with model, tokens, cost, context bar, and git branch.                                    |
-| **file-tracker**  | Tracks files touched in a session with +/- line counts in a tree widget. `/files` for full-screen view. |
 
 ### Integrations
 
