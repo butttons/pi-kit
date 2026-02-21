@@ -282,16 +282,6 @@ class FileTrackerPane {
 		},
 	) {}
 
-	handleInput(data: string): void {
-		if (matchesKey(data, Key.up)) {
-			this.scrollOffset = Math.max(0, this.scrollOffset - 1);
-			this.tui.requestRender();
-		} else if (matchesKey(data, Key.down)) {
-			this.scrollOffset++;
-			this.tui.requestRender();
-		}
-	}
-
 	render(width: number): string[] {
 		const th = this.theme;
 		const innerW = Math.max(1, width - 2);
@@ -641,6 +631,19 @@ export default function fileTracker(pi: ExtensionAPI) {
 	});
 
 	// -- Toggle shortcut and command --
+
+	pi.registerShortcut("ctrl+alt+f", {
+		description: "Toggle file tracker overlay",
+		handler: async (ctx) => {
+			if (isOverlayActive) {
+				closeOverlay();
+				ctx.ui.notify("File tracker hidden.", "info");
+			} else {
+				openOverlay({ ctx });
+				ctx.ui.notify("File tracker visible.", "info");
+			}
+		},
+	});
 
 	pi.registerCommand("files-toggle", {
 		description: "Toggle file tracker overlay",
