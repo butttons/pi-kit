@@ -6,7 +6,7 @@
  * turn via the /rethink command.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 
 const extractThinking = ({ content }: { content: unknown[] }): string => {
@@ -25,10 +25,24 @@ export default function thinkingStash(pi: ExtensionAPI) {
 	let currentThinking = "";
 	let isArmed = false;
 
-	const reset = (): void => {
+	const updateStatus = ({ ctx }: { ctx: ExtensionContext }): void => {
+		if (isArmed && lastThinking) {
+			ctx.ui.setStatus("thinking-stash", "stash armed");
+			return;
+		}
+		if (lastThinking) {
+			const lineCount = lastThinking.split("\n").length;
+			ctx.ui.setStatus("thinking-stash", `stash ${lineCount} lines`);
+			return;
+		}
+		ctx.ui.setStatus("thinking-stash", undefined);
+	};
+
+	const reset = ({ ctx }: { ctx: ExtensionContext }): void => {
 		lastThinking = null;
 		currentThinking = "";
 		isArmed = false;
+		updateStatus({ ctx });
 	};
 
 	pi.on("message_update", async (event) => {
@@ -41,19 +55,20 @@ export default function thinkingStash(pi: ExtensionAPI) {
 		}
 	});
 
-	pi.on("agent_end", async () => {
+	pi.on("agent_end", async (_event, ctx) => {
 		if (currentThinking) {
 			lastThinking = currentThinking;
 		}
 		currentThinking = "";
+		updateStatus({ ctx });
 	});
 
-	pi.on("session_start", async () => {
-		reset();
+	pi.on("session_start", async (_event, ctx) => {
+		reset({ ctx });
 	});
 
-	pi.on("session_switch", async () => {
-		reset();
+	pi.on("session_switch", async (_event, ctx) => {
+		reset({ ctx });
 	});
 
 	pi.registerMessageRenderer(
@@ -83,6 +98,7 @@ export default function thinkingStash(pi: ExtensionAPI) {
 				return;
 			}
 			isArmed = true;
+			updateStatus({ ctx });
 			const lineCount = lastThinking.split("\n").length;
 
 			if (args && args.trim()) {
@@ -97,11 +113,12 @@ export default function thinkingStash(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.on("before_agent_start", async () => {
+	pi.on("before_agent_start", async (_event, ctx) => {
 		if (isArmed && lastThinking) {
 			isArmed = false;
 			const thinking = lastThinking;
 			lastThinking = null;
+			updateStatus({ ctx });
 			return {
 				message: {
 					customType: "resumed-thinking",

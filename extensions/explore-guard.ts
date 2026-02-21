@@ -20,32 +20,55 @@ export default function exploreGuard(pi: ExtensionAPI): void {
   let hasInjectedCheckIn = false;
   let isDisabledForTurn = false;
 
+  const updateStatus = ({
+    ctx,
+  }: {
+    ctx: { ui: { setStatus: (id: string, text: string | undefined) => void } };
+  }): void => {
+    if (isDisabledForTurn) {
+      ctx.ui.setStatus("explore-guard", "explore off");
+      return;
+    }
+    if (consecutiveExploreCount > 0) {
+      ctx.ui.setStatus(
+        "explore-guard",
+        `explore ${consecutiveExploreCount}/${THRESHOLD}`,
+      );
+      return;
+    }
+    ctx.ui.setStatus("explore-guard", undefined);
+  };
+
   pi.registerCommand("explore", {
     description: "Disable explore guard for the current turn",
     handler: async (_args, ctx) => {
       isDisabledForTurn = true;
+      updateStatus({ ctx });
       ctx.ui.notify("Explore guard disabled for the next prompt.", "info");
     },
   });
 
   // Reset counter when user sends a message
-  pi.on("before_agent_start", async () => {
+  pi.on("before_agent_start", async (_event, ctx) => {
     consecutiveExploreCount = 0;
     hasInjectedCheckIn = false;
+    updateStatus({ ctx });
   });
 
   // Re-enable guard after agent finishes
-  pi.on("agent_end", async () => {
+  pi.on("agent_end", async (_event, ctx) => {
     isDisabledForTurn = false;
+    updateStatus({ ctx });
   });
 
   // Count consecutive explore tool calls
-  pi.on("tool_result", async () => {
+  pi.on("tool_result", async (_event, ctx) => {
     consecutiveExploreCount++;
+    updateStatus({ ctx });
   });
 
   // Check threshold before each explore tool call
-  pi.on("tool_call", async (event) => {
+  pi.on("tool_call", async (event, ctx) => {
     if (isDisabledForTurn) return;
 
     if (!EXPLORE_TOOLS.has(event.toolName)) {
@@ -53,12 +76,14 @@ export default function exploreGuard(pi: ExtensionAPI): void {
       // Reset the counter since the agent is doing real work.
       consecutiveExploreCount = 0;
       hasInjectedCheckIn = false;
+      updateStatus({ ctx });
       return;
     }
 
     if (consecutiveExploreCount >= THRESHOLD && !hasInjectedCheckIn) {
       hasInjectedCheckIn = true;
       consecutiveExploreCount = 0;
+      updateStatus({ ctx });
 
       return {
         block: true,
