@@ -56,6 +56,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **thinking-stash**     | Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.                 |
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                  |
 | **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                               |
+| **session-recall**     | `/recall <query>` to search past sessions. Builds a session index and lets the LLM retrieve relevant conversations.             |
 
 ### UI
 

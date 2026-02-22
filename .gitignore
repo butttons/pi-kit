@@ -1,3 +1,4 @@
 .residue/
 node_modules/
 .pi/
+package-lock.json
