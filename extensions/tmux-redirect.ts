@@ -1,9 +1,8 @@
 /**
  * Tmux Redirect Extension
  *
- * Blocks long-running processes that the agent tries to run
- * inline via bash (dev servers, watchers, build --watch, etc.)
- * and tells it to use tmux instead.
+ * Blocks dev server commands that the agent tries to run
+ * inline via bash and tells it to use tmux instead.
  *
  * Does not block if the command is already being sent to tmux
  * via send-keys or if it is piped/backgrounded intentionally.
@@ -12,24 +11,12 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 const LONG_RUNNING_PATTERNS: RegExp[] = [
-  // Dev servers
   /\b(npm|pnpm|bun|yarn)\s+run\s+dev\b/,
-  /\b(npm|pnpm|bun|yarn)\s+run\s+start\b/,
   /\bnpx\s+.*\bdev\b/,
   /\bvite\b(?!\s+build)/,
   /\bnext\s+dev\b/,
   /\bastro\s+dev\b/,
   /\bwrangler\s+dev\b/,
-  /\bnode\s+.*server/,
-
-  // Watchers
-  /--watch\b/,
-  /\bwatch\b/,
-  /\bnodemon\b/,
-
-  // Tailing logs
-  /\bwrangler\s+tail\b/,
-  /\btail\s+-f\b/,
 ];
 
 // Already going through tmux or explicitly backgrounded

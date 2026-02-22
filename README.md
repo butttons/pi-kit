@@ -43,9 +43,8 @@ After install, run `pi config` to enable/disable individual resources from the T
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **safe-delete**   | Intercepts destructive bash commands: `rm` on protected/large paths, `find -delete`, recursive `chmod`/`chown`, `git clean -fdx`, `dd` to devices, wildcard explosions, and more. |
 | **safe-commit**   | Prompts for confirmation before git commits.                                                                                                                                      |
-| **run-confirm**   | Confirms before expensive bash commands (builds, test suites, generators, deploys, installs).                                                                                     |
 | **explore-guard** | Blocks the agent after consecutive read/explore calls without user input, forcing a pause. `/explore` to bypass for one turn.                                                     |
-| **tmux-redirect** | Blocks inline long-running processes (dev servers, watchers) and redirects the agent to use tmux.                                                                                 |
+| **tmux-redirect** | Blocks inline dev server commands and redirects the agent to use tmux.                                                                                                            |
 
 ### Workflow
 
