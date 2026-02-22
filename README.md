@@ -62,6 +62,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | Extension         | Description                                                                                             |
 | ----------------- | ------------------------------------------------------------------------------------------------------- |
 | **context-usage** | Custom footer with model, tokens, cost, context bar, and git branch.                                    |
+| **tmux-status**   | Shows active tmux sessions/panes in the footer. `/tmux` toggles an overview widget with attach commands. |
 
 ### Integrations
 
