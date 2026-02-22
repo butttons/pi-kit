@@ -13,7 +13,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 const EXPLORE_TOOLS = new Set(["read", "bash", "grep", "find", "ls"]);
-const THRESHOLD = 4;
+const THRESHOLD = 10;
 
 export default function exploreGuard(pi: ExtensionAPI): void {
   let consecutiveExploreCount = 0;
@@ -62,7 +62,8 @@ export default function exploreGuard(pi: ExtensionAPI): void {
   });
 
   // Count consecutive explore tool calls
-  pi.on("tool_result", async (_event, ctx) => {
+  pi.on("tool_result", async (event, ctx) => {
+    if (!EXPLORE_TOOLS.has(event.toolName)) return;
     consecutiveExploreCount++;
     updateStatus({ ctx });
   });
