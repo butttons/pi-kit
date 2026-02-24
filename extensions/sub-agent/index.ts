@@ -18,6 +18,7 @@ import { BorderedLoader } from "@mariozechner/pi-coding-agent";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { runSubAgent } from "./runner.js";
 import { buildRecallPrompt, RECALL_SYSTEM_PROMPT } from "./tasks/recall.js";
+import { buildExplorePrompt } from "./tasks/explore.js";
 import type { SubAgentConfig } from "./types.js";
 
 const STATE_KEY = "sub-agent-config";
@@ -219,6 +220,135 @@ export default function subAgent(pi: ExtensionAPI): void {
         content: `${header}\n\n${result.output || "No results found."}`,
         display: true,
         details: {
+          query,
+          isSuccess: result.isSuccess,
+          model: result.modelUsed,
+          toolCallsMade: result.toolCallsMade,
+        },
+      });
+    },
+  });
+
+  // -------------------------------------------------------------------
+  // /sub-explore command -- explore a codebase directory via sub-agent
+  // -------------------------------------------------------------------
+  pi.registerCommand("sub-explore", {
+    description: "Explore a codebase via sub-agent: /sub-explore <path> <question>",
+    handler: async (args, ctx) => {
+      const trimmed = args.trim();
+      const spaceIdx = trimmed.indexOf(" ");
+
+      if (!trimmed || spaceIdx === -1) {
+        ctx.ui.notify("Usage: /sub-explore <path> <question>", "error");
+        return;
+      }
+
+      const targetPath = trimmed.slice(0, spaceIdx);
+      const query = trimmed.slice(spaceIdx + 1).trim();
+
+      if (!query) {
+        ctx.ui.notify("Usage: /sub-explore <path> <question>", "error");
+        return;
+      }
+
+      const model = await resolveModel({ config, ctx });
+      if (!model) {
+        ctx.ui.notify("No model available for sub-agent. Set one with /sub-agent model <provider/model-id>", "error");
+        return;
+      }
+
+      const apiKey = await ctx.modelRegistry.getApiKey(model);
+      if (!apiKey) {
+        ctx.ui.notify(`No API key for model: ${model.provider}/${model.id}`, "error");
+        return;
+      }
+
+      const { systemPrompt, userPrompt, tools } = buildExplorePrompt({
+        targetPath,
+        query,
+      });
+
+      if (!ctx.hasUI) {
+        const result = await runSubAgent({
+          systemPrompt,
+          userPrompt,
+          model,
+          apiKey,
+          tools,
+        });
+
+        pi.sendMessage({
+          customType: "sub-agent-explore",
+          content: result.output || "No findings.",
+          display: true,
+          details: {
+            targetPath,
+            query,
+            isSuccess: result.isSuccess,
+            model: result.model,
+            toolCallsMade: result.toolCallsMade,
+          },
+        });
+        return;
+      }
+
+      const result = await ctx.ui.custom<{
+        output: string;
+        isSuccess: boolean;
+        modelUsed: string;
+        toolCallsMade: string[];
+      } | null>((tui, theme, _kb, done) => {
+        const loader = new BorderedLoader(
+          tui,
+          theme,
+          `Exploring ${targetPath} via ${model.provider}/${model.id}...`,
+        );
+        loader.onAbort = () => done(null);
+
+        const doRun = async () => {
+          const subResult = await runSubAgent({
+            systemPrompt,
+            userPrompt,
+            model,
+            apiKey,
+            tools,
+            signal: loader.signal,
+          });
+
+          return {
+            output: subResult.output,
+            isSuccess: subResult.isSuccess,
+            modelUsed: subResult.model,
+            toolCallsMade: subResult.toolCallsMade,
+          };
+        };
+
+        doRun()
+          .then(done)
+          .catch((err) => {
+            console.error("Sub-agent explore failed:", err);
+            done(null);
+          });
+
+        return loader;
+      });
+
+      if (result === null) {
+        ctx.ui.notify("Cancelled", "info");
+        return;
+      }
+
+      const modelLabel = `${model.provider}/${result.modelUsed}`;
+      const header = result.isSuccess
+        ? `Explore results for ${targetPath} (via ${modelLabel}):`
+        : `Explore failed (via ${modelLabel}):`;
+
+      pi.sendMessage({
+        customType: "sub-agent-explore",
+        content: `${header}\n\n${result.output || "No findings."}`,
+        display: true,
+        details: {
+          targetPath,
           query,
           isSuccess: result.isSuccess,
           model: result.modelUsed,
