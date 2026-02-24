@@ -1,37 +1,24 @@
 /**
- * Session Recall Extension
+ * Recall task -- searches past sessions via a sub-agent.
  *
- * Search past sessions for this project by query.
- *
- * Usage:
- *   /recall how did we fix the file tracker crash
- *   /recall what was the tmux extension approach
- *
- * The command builds a lightweight index of all sessions (date, first
- * message, cost, duration, models, files touched, compaction summaries)
- * and sends it in TOON format alongside your query. The LLM picks the
- * relevant session and can call `recall_session` to retrieve its conversation.
+ * Reuses the session index building and loading logic from the
+ * original session-recall extension, but runs the search in an
+ * isolated sub-agent context instead of polluting the main one.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   truncateHead,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
 } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import type { SubAgentTool } from "../types.js";
 
-/**
- * Minimal TOON encoder for session index data.
- *
- * Handles: primitives, arrays of primitives, and uniform arrays of
- * flat objects (rendered as tabular rows). Covers everything the
- * session index needs without pulling in a dependency.
- *
- * Format reference: https://github.com/toon-format/spec
- */
+// ---------------------------------------------------------------------------
+// TOON encoder (copied from session-recall.ts)
+// ---------------------------------------------------------------------------
+
 function toonValue({ value }: { value: unknown }): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "boolean" || typeof value === "number") return String(value);
@@ -50,7 +37,6 @@ function encodeToon({ data }: { data: Record<string, unknown> }): string {
       if (value.length === 0) {
         lines.push(`${key}[0]:`);
       } else if (typeof value[0] === "object" && value[0] !== null) {
-        // Uniform array of objects -- tabular format
         const fields = Object.keys(value[0] as Record<string, unknown>);
         lines.push(`${key}[${value.length}]{${fields.join(",")}}:`);
         for (const item of value) {
@@ -60,7 +46,6 @@ function encodeToon({ data }: { data: Record<string, unknown> }): string {
           lines.push(`  ${row}`);
         }
       } else {
-        // Array of primitives
         const vals = value.map((v) => toonValue({ value: v })).join(",");
         lines.push(`${key}[${value.length}]: ${vals}`);
       }
@@ -71,6 +56,10 @@ function encodeToon({ data }: { data: Record<string, unknown> }): string {
 
   return lines.join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Session types and parsing
+// ---------------------------------------------------------------------------
 
 type SessionIndex = {
   file: string;
@@ -85,13 +74,6 @@ type SessionIndex = {
   compactionSummaries: string[];
 };
 
-
-function parseArgs({ raw }: { raw: string }): { query: string; isCompact: boolean } {
-  const isCompact = /--compact\b/.test(raw);
-  const query = raw.replace(/--compact\b/, "").trim();
-  return { query, isCompact };
-}
-
 function getSessionDir({ cwd }: { cwd: string }): string {
   const stripped = cwd.startsWith("/") ? cwd.slice(1) : cwd;
   const encoded = stripped.replace(/\//g, "-");
@@ -102,6 +84,22 @@ function getSessionDir({ cwd }: { cwd: string }): string {
     "sessions",
     `--${encoded}--`,
   );
+}
+
+function extractMessageText({
+  message,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw JSONL message with unknown content shape
+  message: Record<string, any>;
+}): string {
+  const content = message.content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+
+  return content
+    .filter((b: Record<string, string>) => b.type === "text")
+    .map((b: Record<string, string>) => b.text)
+    .join("\n");
 }
 
 function parseSessionFile({ filePath }: { filePath: string }): SessionIndex | null {
@@ -156,7 +154,6 @@ function parseSessionFile({ filePath }: { filePath: string }): SessionIndex | nu
       const msg = entry.message;
       if (!msg) continue;
 
-      // Track timestamps for duration
       const ts = msg.timestamp;
       if (typeof ts === "number" && ts > 0) {
         if (firstTimestamp === 0) firstTimestamp = ts;
@@ -189,7 +186,6 @@ function parseSessionFile({ filePath }: { filePath: string }): SessionIndex | nu
         if (msg.model) {
           modelsSet.add(msg.model);
         }
-        // Extract file paths from write/edit tool calls
         if (Array.isArray(msg.content)) {
           for (const block of msg.content) {
             if (
@@ -307,7 +303,6 @@ function loadSession({
         conversation.push(`[ASSISTANT]\n${text}\n`);
       }
     }
-    // Skip toolResult entries -- too noisy
   }
 
   if (conversation.length === 0) {
@@ -316,7 +311,6 @@ function loadSession({
 
   let result = conversation.join("\n---\n\n");
 
-  // If query provided, try to extract relevant chunks
   if (queryLower) {
     const relevant = conversation.filter((chunk) =>
       chunk.toLowerCase().includes(queryLower),
@@ -343,110 +337,98 @@ function loadSession({
   return truncation.content;
 }
 
-function extractMessageText({
-  message,
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+const RECALL_SYSTEM_PROMPT = `You are a session recall assistant. You search past conversation sessions to find information the user is looking for.
+
+You will receive a session index in TOON format (compact key-value + tabular arrays) alongside the user's query.
+
+Your job:
+1. Identify which session(s) are most likely relevant based on the query.
+2. Use the recall_session tool to load the conversation from the matching session file.
+3. Synthesize a clear, concise answer based on what you find.
+
+If no sessions seem relevant, say so directly. Do not fabricate information.
+Always cite which session file(s) you found the information in.`;
+
+export function buildRecallPrompt({
+  cwd,
+  query,
+  isCompact,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw JSONL message with unknown content shape
-  message: Record<string, any>;
-}): string {
-  const content = message.content;
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
+  cwd: string;
+  query: string;
+  isCompact: boolean;
+}): { userPrompt: string; tools: SubAgentTool[] } {
+  const sessions = buildIndex({ cwd });
 
-  return content
-    .filter((b: Record<string, string>) => b.type === "text")
-    .map((b: Record<string, string>) => b.text)
-    .join("\n");
-}
-
-export default function sessionRecall(pi: ExtensionAPI): void {
-  pi.registerTool({
-    name: "recall_session",
-    label: "Recall Session",
-    description:
-      "Load a past session's conversation by filename. Use after /recall provides the session index.",
-    parameters: Type.Object({
-      sessionFile: Type.String({
-        description: "The session .jsonl filename from the index",
-      }),
-      query: Type.Optional(
-        Type.String({
-          description:
-            "Optional focus query to filter relevant messages within the session",
-        }),
-      ),
-    }),
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const result = loadSession({
-        cwd: ctx.cwd,
-        sessionFile: params.sessionFile,
-        query: params.query,
-      });
-
+  const flatSessions = sessions.map((s) => {
+    if (isCompact) {
       return {
-        content: [{ type: "text", text: result }],
-        details: { sessionFile: params.sessionFile, query: params.query },
+        file: s.file,
+        date: s.date,
+        name: s.name ?? "",
+        firstMessage: s.firstMessage,
+        messageCount: s.messageCount,
+        durationMinutes: s.durationMinutes,
+        totalCost: s.totalCost,
+        models: s.models.join("|"),
       };
-    },
+    }
+    return {
+      file: s.file,
+      date: s.date,
+      name: s.name ?? "",
+      firstMessage: s.firstMessage,
+      messageCount: s.messageCount,
+      durationMinutes: s.durationMinutes,
+      totalCost: s.totalCost,
+      models: s.models.join("|"),
+      filesTouched: s.filesTouched.join("|"),
+      compactionSummaries: s.compactionSummaries.join("|"),
+    };
   });
 
-  pi.registerCommand("recall", {
-    description: "Search past sessions: /recall [--compact] <query>",
-    handler: async (args, ctx) => {
-      const { query, isCompact } = parseArgs({ raw: args });
+  const payload = { query, sessions: flatSessions };
 
-      if (!query) {
-        ctx.ui.notify("Usage: /recall [--compact] <query>", "error");
-        return;
-      }
+  const userPrompt = [
+    "Search my past sessions for the query below. The session index is in TOON format.",
+    "",
+    "```toon",
+    encodeToon({ data: payload }),
+    "```",
+  ].join("\n");
 
-      const sessions = buildIndex({ cwd: ctx.cwd });
-
-      // Flatten nested arrays into pipe-delimited strings for tabular encoding
-      const flatSessions = sessions.map((s) => {
-        if (isCompact) {
-          return {
-            file: s.file,
-            date: s.date,
-            name: s.name ?? "",
-            firstMessage: s.firstMessage,
-            messageCount: s.messageCount,
-            durationMinutes: s.durationMinutes,
-            totalCost: s.totalCost,
-            models: s.models.join("|"),
-          };
-        }
-        return {
-          file: s.file,
-          date: s.date,
-          name: s.name ?? "",
-          firstMessage: s.firstMessage,
-          messageCount: s.messageCount,
-          durationMinutes: s.durationMinutes,
-          totalCost: s.totalCost,
-          models: s.models.join("|"),
-          filesTouched: s.filesTouched.join("|"),
-          compactionSummaries: s.compactionSummaries.join("|"),
-        };
+  const recallTool: SubAgentTool = {
+    name: "recall_session",
+    description:
+      "Load a past session's conversation by filename. Use after reviewing the session index to retrieve the full conversation.",
+    parameters: {
+      type: "object",
+      properties: {
+        sessionFile: {
+          type: "string",
+          description: "The session .jsonl filename from the index",
+        },
+        query: {
+          type: "string",
+          description: "Optional focus query to filter relevant messages within the session",
+        },
+      },
+      required: ["sessionFile"],
+    },
+    execute: async (params) => {
+      return loadSession({
+        cwd,
+        sessionFile: params.sessionFile as string,
+        query: params.query as string | undefined,
       });
-
-      const payload = {
-        query,
-        sessions: flatSessions,
-      };
-
-      const prompt = [
-        "Search my past sessions for the query below. The session index is in TOON format (compact key-value + tabular arrays).",
-        "Identify which session(s) are most likely relevant.",
-        "Use the recall_session tool to load the conversation from the matching session file.",
-        "Then answer the query based on what you find.",
-        "",
-        "```toon",
-        encodeToon({ data: payload }),
-        "```",
-      ].join("\n");
-
-      pi.sendUserMessage(prompt);
     },
-  });
+  };
+
+  return { userPrompt, tools: [recallTool] };
 }
+
+export { RECALL_SYSTEM_PROMPT };
