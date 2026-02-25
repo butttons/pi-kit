@@ -56,7 +56,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **thinking-stash**     | Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.                 |
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                  |
 | **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                               |
-| **sub-agent**          | Sub-agent system for running commands in isolated contexts. `/recall <query>` searches past sessions. `/sub-agent model` configures the model. |
+| **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                        |
 
 ### UI
 
