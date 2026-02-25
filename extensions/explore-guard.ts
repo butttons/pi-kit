@@ -39,12 +39,23 @@ export default function exploreGuard(pi: ExtensionAPI): void {
     ctx.ui.setStatus("explore-guard", undefined);
   };
 
+  const toggle = ({ ctx }: { ctx: { ui: { setStatus: (id: string, text: string | undefined) => void; notify: (msg: string, level: string) => void } } }): void => {
+    isDisabledForTurn = !isDisabledForTurn;
+    updateStatus({ ctx });
+    ctx.ui.notify(`Explore guard ${isDisabledForTurn ? "off" : "on"}`, "info");
+  };
+
   pi.registerCommand("explore", {
-    description: "Disable explore guard for the current turn",
+    description: "Toggle explore guard on/off for the current turn",
     handler: async (_args, ctx) => {
-      isDisabledForTurn = true;
-      updateStatus({ ctx });
-      ctx.ui.notify("Explore guard disabled for the next prompt.", "info");
+      toggle({ ctx });
+    },
+  });
+
+  pi.registerShortcut("ctrl+shift+e", {
+    description: "Toggle explore guard",
+    handler: async (ctx) => {
+      toggle({ ctx });
     },
   });
 

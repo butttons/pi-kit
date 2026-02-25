@@ -53,7 +53,7 @@ pnpm exec wrangler d1 migrations apply DB --local
 pnpm exec wrangler d1 migrations create DB "add_users_table"
 ```
 
-The `DB` above is the binding name defined in the wrangler config, not the database name.
+The `DB` above is the database name, not the binding name. Find it in the wrangler config under `[[d1_databases]]` as `database_name`.
 
 ### Querying
 

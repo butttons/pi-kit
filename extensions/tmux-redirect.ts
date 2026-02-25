@@ -34,7 +34,33 @@ function isLongRunning({ command }: { command: string }): boolean {
 }
 
 export default function tmuxRedirect(pi: ExtensionAPI): void {
+  let isEnabled = true;
+
+  const updateStatus = ({
+    ctx,
+  }: {
+    ctx: { ui: { setStatus: (id: string, text: string | undefined) => void } };
+  }): void => {
+    ctx.ui.setStatus(
+      "tmux-redirect",
+      isEnabled ? undefined : "tmux-redirect off",
+    );
+  };
+
+  pi.registerCommand("tmux-redirect", {
+    description: "Toggle tmux redirect on/off",
+    handler: async (_args, ctx) => {
+      isEnabled = !isEnabled;
+      updateStatus({ ctx });
+      ctx.ui.notify(
+        `tmux-redirect ${isEnabled ? "on" : "off"}`,
+        "info",
+      );
+    },
+  });
+
   pi.on("tool_call", async (event) => {
+    if (!isEnabled) return;
     if (event.toolName !== "bash") return;
 
     const command = (event.input as { command?: string }).command ?? "";
