@@ -90,6 +90,12 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **cloudflare-api** | Cloudflare developer documentation index for looking up resources.                                     |
 | **wrangler-ops**   | Operational patterns for Wrangler CLI: deploy, D1 migrations, queries, R2 management, type generation. |
 
+### Knowledge
+
+| Skill        | Description                                                        |
+| ------------ | ------------------------------------------------------------------ |
+| **obi**      | Look up documentation in Obsidian vaults using the `obi` CLI.     |
+
 ### Tools
 
 | Skill              | Description                                                                                      |
