@@ -94,7 +94,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 | Skill        | Description                                                        |
 | ------------ | ------------------------------------------------------------------ |
-| **obi**      | Look up documentation in Obsidian vaults using the `obi` CLI.     |
+| **obi**      | Look up documentation in Obsidian vaults using the [`obi`](https://github.com/butttons/obi) CLI.     |
 
 ### Tools
 
