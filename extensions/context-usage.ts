@@ -2,10 +2,11 @@
  * Custom Footer
  *
  * Replaces the default dense statusline with a cleaner layout.
- * Includes model, token stats, cost, context bar, and git branch.
+ * Includes model, token stats, cost, context bar, project name, and git branch.
  */
 
 import { execSync } from "node:child_process";
+import { basename } from "node:path";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
@@ -40,6 +41,8 @@ function isGitDirty(): boolean {
 export default function (pi: ExtensionAPI) {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- ctx type varies across event handlers
 	function setupFooter(ctx: any) {
+		const projectName = basename(ctx.cwd);
+
 		ctx.ui.setFooter((tui: Tui, theme: Theme, footerData: FooterData) => {
 			const unsub = footerData.onBranchChange(() => tui.requestRender());
 
@@ -102,9 +105,12 @@ export default function (pi: ExtensionAPI) {
 					// Left: model | tokens | cost | context bar
 					const left = [modelStr, statsStr, costStr, contextStr].join(sep);
 
-					// Right: extension statuses | branch
+					// Right: extension statuses | project | branch
+					const projectStr = theme.fg("accent", projectName);
+
 					const rightParts: string[] = [];
 					if (extStr) rightParts.push(extStr);
+					rightParts.push(projectStr);
 					if (branchStr) rightParts.push(branchStr);
 					const right = rightParts.join(sep);
 
