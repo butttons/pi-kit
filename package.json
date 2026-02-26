@@ -1,27 +1,27 @@
 {
-	"name": "pi-kit",
-	"version": "1.10.0",
-	"description": "Personal pi extensions, skills, prompts, and themes",
-	"author": "Yash (https://github.com/butttons)",
-	"keywords": [
-		"pi-package"
-	],
-	"peerDependencies": {
-		"@mariozechner/pi-agent-core": "*",
-		"@mariozechner/pi-ai": "*",
-		"@mariozechner/pi-coding-agent": "*",
-		"@mariozechner/pi-tui": "*",
-		"@sinclair/typebox": "*"
-	},
-	"pi": {
-		"extensions": [
-			"./extensions"
-		],
-		"skills": [
-			"./skills"
-		],
-		"themes": [
-			"./themes"
-		]
-	}
+  "name": "pi-kit",
+  "version": "1.10.2",
+  "description": "Personal pi extensions, skills, prompts, and themes",
+  "author": "Yash (https://github.com/butttons)",
+  "keywords": [
+    "pi-package"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-agent-core": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "themes": [
+      "./themes"
+    ]
+  }
 }

@@ -45,6 +45,7 @@ type SessionData = {
   project: string;
   file: string;
   date: string;
+  startTime: string;
   userMessages: string[];
   compactionSummaries: string[];
   filesTouched: string[];
@@ -123,7 +124,11 @@ async function fetchCommits({
             date: string;
             author: string;
           };
-          commits.push({ repo, ...parsed });
+          commits.push({
+            repo,
+            ...parsed,
+            date: new Date(parsed.date).toLocaleString(),
+          });
         } catch {
           // skip malformed lines
         }
@@ -292,6 +297,12 @@ function gatherSessions({ range }: { range: DateRange }): SessionData[] {
       const filePath = join(dirPath, file);
       const project = extractProjectName({ dirName: dir });
 
+      // Parse UTC timestamp from filename: 2026-02-26T11-12-52-404Z_uuid.jsonl
+      // Convert dashes back to colons for the time part, drop the ms+uuid suffix
+      const tsRaw = file.slice(0, 23); // 2026-02-26T11-12-52-404
+      const tsIso = tsRaw.replace(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2}).*/, "$1T$2:$3:$4Z");
+      const startTime = new Date(tsIso).toLocaleString();
+
       const userMessages: string[] = [];
       const compactionSummaries: string[] = [];
       const filesTouched = new Set<string>();
@@ -349,6 +360,7 @@ function gatherSessions({ range }: { range: DateRange }): SessionData[] {
         project,
         file,
         date: dateStr,
+        startTime,
         userMessages: userMessages.slice(0, 30),
         compactionSummaries,
         filesTouched: [...filesTouched].slice(0, 30),
@@ -426,7 +438,7 @@ export function formatBriefData({ data }: { data: BriefData }): string {
     for (const [repo, commits] of byRepo) {
       lines.push(`\n**${repo}** (${commits.length}):`);
       for (const c of commits) {
-        lines.push(`- \`${c.sha}\` ${c.message} (${c.date})`);
+        lines.push(`- [\`${c.sha}\`](https://github.com/${repo}/commit/${c.sha}) ${c.message} (${c.date})`);
       }
     }
     lines.push("");
@@ -467,7 +479,7 @@ export function formatBriefData({ data }: { data: BriefData }): string {
       const totalMessages = sessions.reduce((sum, s) => sum + s.messageCount, 0);
       lines.push(`### ${project} (${sessions.length} sessions, ${totalMessages} messages)`);
       for (const s of sessions) {
-        lines.push(`\n**${s.file}** (${s.messageCount} messages, ${s.filesTouched.length} files touched):`);
+        lines.push(`\n**${s.file}** (started ${s.startTime}, ${s.messageCount} messages, ${s.filesTouched.length} files touched):`);
 
         if (s.compactionSummaries.length > 0) {
           lines.push("Compaction summaries:");
