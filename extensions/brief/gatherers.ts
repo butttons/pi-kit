@@ -97,21 +97,29 @@ async function fetchActiveRepos({
   return repos;
 }
 
+async function fetchUsername({ exec }: { exec: ExecFn }): Promise<string> {
+  const result = await exec("bash", ["-c", "gh api user --jq '.login'"], { timeout: 10000 });
+  return result.code === 0 && result.stdout.trim() ? result.stdout.trim() : "";
+}
+
 async function fetchCommits({
   repos,
   range,
+  username,
   exec,
 }: {
   repos: string[];
   range: DateRange;
+  username: string;
   exec: ExecFn;
 }): Promise<Commit[]> {
   const commits: Commit[] = [];
+  const authorParam = username ? `&author=${username}` : "";
 
   for (const repo of repos) {
     const result = await exec("bash", [
       "-c",
-      `gh api "repos/${repo}/commits?since=${range.start}T00:00:00Z&until=${range.end}T23:59:59Z&per_page=100" --jq '.[] | {sha: .sha[:7], message: .commit.message | split("\\n")[0], date: .commit.author.date, author: .commit.author.name}'`,
+      `gh api "repos/${repo}/commits?since=${range.start}T00:00:00Z&until=${range.end}T23:59:59Z${authorParam}&per_page=100" --jq '.[] | {sha: .sha[:7], message: .commit.message | split("\\n")[0], date: .commit.author.date, author: .commit.author.name}'`,
     ], { timeout: 15000 });
 
     if (result.code === 0 && result.stdout.trim()) {
@@ -141,18 +149,22 @@ async function fetchCommits({
 
 async function fetchPRs({
   range,
+  username,
   exec,
 }: {
   range: DateRange;
+  username: string;
   exec: ExecFn;
 }): Promise<{ authored: PullRequest[]; reviewed: PullRequest[] }> {
   const authored: PullRequest[] = [];
   const reviewed: PullRequest[] = [];
 
+  if (!username) return { authored, reviewed };
+
   // PRs authored
   const authoredResult = await exec("bash", [
     "-c",
-    `gh search prs --author=butttons --created=${range.start}..${range.end} --json repository,title,state,createdAt,url --limit 100`,
+    `gh search prs --author=${username} --created=${range.start}..${range.end} --json repository,title,state,createdAt,url --limit 100`,
   ], { timeout: 15000 });
 
   if (authoredResult.code === 0 && authoredResult.stdout.trim()) {
@@ -181,7 +193,7 @@ async function fetchPRs({
   // PRs reviewed
   const reviewedResult = await exec("bash", [
     "-c",
-    `gh search prs --reviewed-by=butttons --created=${range.start}..${range.end} --json repository,title,state,createdAt,url --limit 100`,
+    `gh search prs --reviewed-by=${username} --created=${range.start}..${range.end} --json repository,title,state,createdAt,url --limit 100`,
   ], { timeout: 15000 });
 
   if (reviewedResult.code === 0 && reviewedResult.stdout.trim()) {
@@ -217,9 +229,10 @@ async function gatherGitHub({
   range: DateRange;
   exec: ExecFn;
 }): Promise<GitHubData> {
+  const username = await fetchUsername({ exec });
   const repos = await fetchActiveRepos({ range, exec });
-  const commits = await fetchCommits({ repos, range, exec });
-  const { authored, reviewed } = await fetchPRs({ range, exec });
+  const commits = await fetchCommits({ repos, range, username, exec });
+  const { authored, reviewed } = await fetchPRs({ range, username, exec });
 
   return {
     commits,
