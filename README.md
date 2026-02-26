@@ -57,6 +57,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                  |
 | **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                               |
 | **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                        |
+| **brief**              | `/brief <daily\|weekly\|monthly>` generates activity briefs from GitHub commits/PRs and pi session transcripts. Writes markdown to an Obsidian vault. |
 
 ### UI
 
@@ -94,7 +95,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 | Skill        | Description                                                        |
 | ------------ | ------------------------------------------------------------------ |
-| **obi**      | Look up documentation in Obsidian vaults using the [`obi`](https://github.com/butttons/obi) CLI.     |
+| **obi**      | Look up documentation in Obsidian vaults using the [obi](https://github.com/butttons/obi) CLI.       |
 
 ### Tools
 
