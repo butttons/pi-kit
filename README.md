@@ -95,7 +95,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 | Skill        | Description                                                        |
 | ------------ | ------------------------------------------------------------------ |
-| **obi**      | Look up documentation in Obsidian vaults using the [obi](https://github.com/butttons/obi) CLI.       |
+| **obi**      | Query Obsidian vaults via the [obi](https://github.com/butttons/obi) CLI. Use for any vault data lookup instead of grep or find -- searching, filtering by frontmatter, reading sections, checking backlinks, finding unread or recent notes. |
 
 ### Tools
 

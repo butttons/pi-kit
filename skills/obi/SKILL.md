@@ -1,6 +1,6 @@
 ---
 name: obi
-description: Look up documentation in Obsidian vaults using obi CLI. Use when the user asks to check docs, look something up, find a note, or reference project documentation.
+description: Query Obsidian vaults via obi CLI. Use for any vault data lookup instead of grep or find -- searching notes, filtering by frontmatter (read status, type, tags), listing folders, reading sections, checking backlinks, and finding unread or recent notes.
 ---
 
 # Obsidian Vault Lookup
