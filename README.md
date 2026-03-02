@@ -71,7 +71,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | Extension  | Description                                                                                                                                                |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **dora**   | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                        |
-| **pencil** | MCP bridge for [Pencil](https://pencil.li) design tool. Discovers tools at load, lazily spawns client. Configure via `PENCIL_MCP_BINARY` / `PENCIL_MCP_ARGS` env vars. |
+| **pencil** | MCP bridge for [Pencil](https://pencil.dev) design tool. Discovers tools at load, lazily spawns client. Configure via `PENCIL_MCP_BINARY` / `PENCIL_MCP_ARGS` env vars. |
 
 ## Skills
 
