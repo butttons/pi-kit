@@ -68,9 +68,10 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 ### Integrations
 
-| Extension | Description                                                                         |
-| --------- | ----------------------------------------------------------------------------------- |
-| **dora**  | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI. |
+| Extension  | Description                                                                                                                                                |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **dora**   | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                        |
+| **pencil** | MCP bridge for [Pencil](https://pencil.li) design tool. Discovers tools at load, lazily spawns client. Configure via `PENCIL_MCP_BINARY` / `PENCIL_MCP_ARGS` env vars. |
 
 ## Skills
 
@@ -101,6 +102,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 | Skill              | Description                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
+| **beans**          | Manage tasks, bugs, and features with the [beans](https://github.com/hmans/beans) issue tracker. |
 | **tmux-helper**    | Interact with tmux sessions, windows, and panes. Covers capture-pane, send-keys, and tmuxinator. |
 | **playwright-cli** | Browser automation command reference for playwright-cli.                                         |
 | **pi-costs**       | Analyze pi session costs, token usage, and statistics.                                           |
