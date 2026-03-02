@@ -40,13 +40,32 @@ Deploy scripts are usually defined in `package.json`. Prefer those when availabl
 
 ## D1 Database Operations
 
+### Persistent State Directory
+
+Dev servers often use `--persist-to` to store local D1 data in a shared directory (e.g. `--persist-to=../../data`). When querying local D1, you must pass the same `--persist-to` flag so wrangler reads from the correct SQLite files.
+
+Always check the worker's `package.json` dev script for `--persist-to`:
+
+```bash
+grep 'persist-to' package.json
+```
+
+If a `--persist-to` path exists, pass it on all local D1 commands:
+
+```bash
+pnpm exec wrangler d1 execute DB --local --persist-to=../../data \
+  --command "SELECT name FROM sqlite_master WHERE type='table'"
+```
+
+Without this flag, wrangler defaults to `.wrangler/state/v3/d1` inside the worker directory, which will be empty if the dev server persists elsewhere.
+
 ### Migrations
 
 ```bash
 # Apply migrations to remote database
 pnpm exec wrangler d1 migrations apply DB --remote -c wrangler.local.jsonc
 
-# Apply to local (dev) database
+# Apply to local (dev) database (include --persist-to if used)
 pnpm exec wrangler d1 migrations apply DB --local
 
 # Create a new migration
@@ -62,8 +81,8 @@ The `DB` above is the database name, not the binding name. Find it in the wrangl
 pnpm exec wrangler d1 execute DB --remote -c wrangler.local.jsonc \
   --command "SELECT COUNT(*) FROM users"
 
-# Query local D1
-pnpm exec wrangler d1 execute DB --local \
+# Query local D1 (check package.json for --persist-to path first)
+pnpm exec wrangler d1 execute DB --local --persist-to=../../data \
   --command "SELECT name FROM sqlite_master WHERE type='table'"
 
 # Check migration state
@@ -140,3 +159,4 @@ Redeploy after migration changes. Migrations update the database schema, but the
 - Never modify the committed `wrangler.jsonc` unless the user explicitly asks.
 - Use `pnpm exec wrangler` (or `npx wrangler`) rather than a global install.
 - Run dev servers in tmux, not inline.
+- For local D1 commands, always check the worker's `package.json` dev script for `--persist-to` and pass it to wrangler. Without it, wrangler reads from the wrong directory.
