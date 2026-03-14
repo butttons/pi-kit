@@ -79,10 +79,8 @@ BREAKING CHANGE: JWT tokens now required for all endpoints
    - Clear, concise header in present tense.
    - Optional body with bullet points for complex changes. Always use bullet points when adding a body.
    - Optional footer for breaking changes or references.
-3. Output the proposed commit message directly as plain text.
-4. Ask the user inline if it looks good.
-5. If yes, commit the changes using `git commit -m "..."`.
-6. If no, incorporate the feedback and go back to step 2.
+3. Output **only** the commit message directly as plain text. Do not include any preamble, explanation, or confirmation question.
+4. Do not ask if it looks good. Do not commit the changes.
 
 ## Best Practices
 
