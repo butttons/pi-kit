@@ -48,30 +48,31 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 ### Workflow
 
-| Extension              | Description                                                                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **plan-mode**          | `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle. Uses `dora` if available |
-| **handoff**            | `/handoff` command to transfer context to a new focused session.                                                                |
-| **auto-commit-nudge**  | Nudges the agent to commit after several file writes without a git commit. Off by default, `/commit-nudge` to toggle.            |
-| **thinking-stash**     | Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.                 |
-| **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                  |
-| **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                               |
-| **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                        |
+| Extension              | Description                                                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **plan-mode**          | `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle. Uses `dora` if available                       |
+| **handoff**            | `/handoff` command to transfer context to a new focused session.                                                                                      |
+| **auto-commit-nudge**  | Nudges the agent to commit after several file writes without a git commit. Off by default, `/commit-nudge` to toggle.                                 |
+| **thinking-stash**     | Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.                                       |
+| **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                                        |
+| **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                                                     |
+| **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                                               |
 | **brief**              | `/brief <daily\|weekly\|monthly>` generates activity briefs from GitHub commits/PRs and pi session transcripts. Writes markdown to an Obsidian vault. |
 
 ### UI
 
-| Extension         | Description                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| **context-usage** | Custom footer with model, tokens, cost, context bar, and git branch.                                    |
+| Extension         | Description                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| **context-usage** | Custom footer with model, tokens, cost, context bar, and git branch.                                     |
 | **tmux-status**   | Shows active tmux sessions/panes in the footer. `/tmux` toggles an overview widget with attach commands. |
 
 ### Integrations
 
-| Extension  | Description                                                                                                                                                |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **dora**   | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                        |
-| **pencil** | MCP bridge for [Pencil](https://pencil.dev) design tool. Discovers tools at load, lazily spawns client. Configure via `PENCIL_MCP_BINARY` / `PENCIL_MCP_ARGS` env vars. |
+| Extension      | Description                                                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **dora**       | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                                     |
+| **pencil**     | MCP bridge for [Pencil](https://pencil.dev) design tool. Discovers tools at load, lazily spawns client. Configure via `PENCIL_MCP_BINARY` / `PENCIL_MCP_ARGS` env vars. |
+| **exa-search** | Web search via [Exa AI](https://exa.ai). Set `EXA_API_KEY`, then use `exa_search` tool for real-time web search with highlights.                                        |
 
 ## Skills
 
@@ -94,9 +95,9 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 ### Knowledge
 
-| Skill        | Description                                                        |
-| ------------ | ------------------------------------------------------------------ |
-| **obi**      | Query Obsidian vaults via the [obi](https://github.com/butttons/obi) CLI. Use for any vault data lookup instead of grep or find -- searching, filtering by frontmatter, reading sections, checking backlinks, finding unread or recent notes. |
+| Skill   | Description                                                                                                                                                                                                                                   |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **obi** | Query Obsidian vaults via the [obi](https://github.com/butttons/obi) CLI. Use for any vault data lookup instead of grep or find -- searching, filtering by frontmatter, reading sections, checking backlinks, finding unread or recent notes. |
 
 ### Tools
 
