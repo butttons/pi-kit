@@ -346,7 +346,12 @@ export default function brief(pi: ExtensionAPI): void {
           formatted,
         });
 
-        const apiKey = await ctx.modelRegistry.getApiKey(ctx.model!);
+        const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model!);
+        if (!auth.ok || !auth.apiKey) {
+          throw new Error(
+            auth.ok ? `No API key for ${ctx.model!.provider}` : auth.error,
+          );
+        }
 
         const userMessage: Message = {
           role: "user",
@@ -357,7 +362,7 @@ export default function brief(pi: ExtensionAPI): void {
         const response = await complete(
           ctx.model!,
           { systemPrompt: SYSTEM_PROMPT, messages: [userMessage] },
-          { apiKey, signal },
+          { apiKey: auth.apiKey, headers: auth.headers, signal },
         );
 
         if (response.stopReason === "aborted") {
