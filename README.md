@@ -58,6 +58,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                                                     |
 | **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                                               |
 | **brief**              | `/brief <daily\|weekly\|monthly>` generates activity briefs from GitHub commits/PRs and pi session transcripts. Writes markdown to an Obsidian vault. |
+| **lazy-agents**        | Loads AGENTS.md files on demand as the agent touches directories within the project. Avoids context bloat from loading all project rules upfront.        |
 
 ### UI
 
@@ -107,6 +108,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **tmux-helper**    | Interact with tmux sessions, windows, and panes. Covers capture-pane, send-keys, and tmuxinator. |
 | **playwright-cli** | Browser automation command reference for playwright-cli.                                         |
 | **pi-costs**       | Analyze pi session costs, token usage, and statistics.                                           |
+| **tanstack-start** | Build full-stack React apps with TanStack Start: routing, server functions, middleware, deployment. |
 
 ## Themes
 
