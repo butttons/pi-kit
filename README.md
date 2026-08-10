@@ -109,6 +109,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **playwright-cli** | Browser automation command reference for playwright-cli.                                         |
 | **pi-costs**       | Analyze pi session costs, token usage, and statistics.                                           |
 | **tanstack-start** | Build full-stack React apps with TanStack Start: routing, server functions, middleware, deployment. |
+| **herdr-pi-subagents** | Orchestrate named pi rpc-mode subagents in herdr panes: spawn with per-slice models, prompt via JSON frames, status waits, live session-JSONL visibility, workspace grouping and cleanup. |
 
 ## Themes
 
