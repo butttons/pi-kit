@@ -43,8 +43,6 @@ After install, run `pi config` to enable/disable individual resources from the T
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **safe-delete**   | Intercepts destructive bash commands: `rm` on protected/large paths, `find -delete`, recursive `chmod`/`chown`, `git clean -fdx`, `dd` to devices, wildcard explosions, and more. |
 | **safe-commit**   | Prompts for confirmation before git commits.                                                                                                                                      |
-| **explore-guard** | Blocks the agent after consecutive read/explore calls without user input, forcing a pause. `/explore` to bypass for one turn.                                                     |
-| **tmux-redirect** | Blocks inline dev server commands and redirects the agent to use tmux.                                                                                                            |
 
 ### Workflow
 
@@ -52,12 +50,9 @@ After install, run `pi config` to enable/disable individual resources from the T
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **plan-mode**          | `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle. Uses `dora` if available                       |
 | **handoff**            | `/handoff` command to transfer context to a new focused session.                                                                                      |
-| **auto-commit-nudge**  | Nudges the agent to commit after several file writes without a git commit. Off by default, `/commit-nudge` to toggle.                                 |
 | **thinking-stash**     | Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.                                       |
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                                        |
-| **verbosity-leash**    | System prompt injection enforcing concise commit messages, PR descriptions, changelogs, and docs.                                                     |
 | **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                                               |
-| **brief**              | `/brief <daily\|weekly\|monthly>` generates activity briefs from GitHub commits/PRs and pi session transcripts. Writes markdown to an Obsidian vault. |
 | **lazy-agents**        | Loads AGENTS.md files on demand as the agent touches directories within the project. Avoids context bloat from loading all project rules upfront.        |
 
 ### UI
@@ -65,14 +60,12 @@ After install, run `pi config` to enable/disable individual resources from the T
 | Extension         | Description                                                                                              |
 | ----------------- | -------------------------------------------------------------------------------------------------------- |
 | **context-usage** | Custom footer with model, tokens, cost, context bar, and git branch.                                     |
-| **tmux-status**   | Shows active tmux sessions/panes in the footer. `/tmux` toggles an overview widget with attach commands. |
 
 ### Integrations
 
 | Extension      | Description                                                                                                                                                             |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **dora**       | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                                     |
-| **pencil**     | MCP bridge for [Pencil](https://pencil.dev) design tool. Discovers tools at load, lazily spawns client. Configure via `PENCIL_MCP_BINARY` / `PENCIL_MCP_ARGS` env vars. |
 | **exa-search** | Web search via [Exa AI](https://exa.ai). Set `EXA_API_KEY`, then use `exa_search` tool for real-time web search with highlights.                                        |
 
 ## Skills
@@ -91,8 +84,8 @@ After install, run `pi config` to enable/disable individual resources from the T
 
 | Skill              | Description                                                                                            |
 | ------------------ | ------------------------------------------------------------------------------------------------------ |
-| **cloudflare-api** | Cloudflare developer documentation index for looking up resources.                                     |
 | **wrangler-ops**   | Operational patterns for Wrangler CLI: deploy, D1 migrations, queries, R2 management, type generation. |
+| **pocketbase** | PocketBase backend work: collections, records, auth, realtime, files, hooks, migrations, and the JS/Go SDKs. |
 
 ### Knowledge
 
@@ -105,7 +98,6 @@ After install, run `pi config` to enable/disable individual resources from the T
 | Skill              | Description                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
 | **beans**          | Manage tasks, bugs, and features with the [beans](https://github.com/hmans/beans) issue tracker. |
-| **tmux-helper**    | Interact with tmux sessions, windows, and panes. Covers capture-pane, send-keys, and tmuxinator. |
 | **playwright-cli** | Browser automation command reference for playwright-cli.                                         |
 | **pi-costs**       | Analyze pi session costs, token usage, and statistics.                                           |
 | **tanstack-start** | Build full-stack React apps with TanStack Start: routing, server functions, middleware, deployment. |
