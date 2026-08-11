@@ -70,6 +70,17 @@ Put these rules verbatim in every spawn prompt where the agent will search or re
 - **Read files with `pi.read`, never `cat`/`sed` through `pi.bash`** (repo rule; also pi.read's section view replaces `sed -n` line ranges).
 - Evidence: in a 5-subagent transcript audit, the only agent with zero friction on risky greps used `settle: true` everywhere; the cleanest agents used `pi.grep`/`pi.read` exclusively. Model tier was not the differentiator.
 
+## Monitoring and anomaly escalation
+
+Fire-and-forget means no polling for COMPLETION, but DO watch running agents for stalls when work is in flight:
+
+- **Cadence**: every few minutes, `herdr pane read <pane-id> --source recent-unwrapped --lines 50` on each running subagent pane (get pane ids from the spawn acknowledgement or `herdr pane list`).
+- **The anomaly to detect is semantic, not silence**: the agent is stuck on ONE sub-problem across 3-4+ turns without progress — e.g. typecheck fails, fix, fails the same way, fix, fails again; or re-attempting the same edit/command with cosmetic variations. Output volume is irrelevant; an agent can be busy and still be spinning. When you read a pane, ask: "what is it trying to solve right now, and how many turns has it spent on exactly that?"
+- **Response ladder**:
+  1. `subagent_resume({ sessionPath, message })` with a corrective steer (cheap, keeps progress).
+  2. `subagent_interrupt({ id })` then resume, or respawn fresh at a higher thinking level (costs in-flight progress).
+  3. **Thinking-level bumps on a LIVE session are a TUI-only lever** — the orchestrator cannot change model/thinking mid-run (`subagent_resume` has no such param). Ping the user: "agent X is stuck, bump its thinking in the pane" (user steers panes directly).
+
 ## Standing rules (user)
 
 - Only the orchestrator (main session) or the user runs git commit/push. Subagents never commit — put it in every prompt.
