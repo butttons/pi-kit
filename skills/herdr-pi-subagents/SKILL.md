@@ -1,16 +1,16 @@
 ---
 name: herdr-pi-subagents
-description: "Orchestrate subagents in herdr from pi fabric: taskflow (/tf) is the backbone for any multi-phase work — consistent plan/verify/run cycles with tracked, resumable, saveable flows. Plain subagent tool only for single one-off delegations. Covers exact fabric_exec call shapes, model tiers, gotchas."
+description: "Orchestrate subagents in herdr from pi fabric using the plain subagent tool (pi-herdr-agents). Covers exact fabric_exec call shapes, model tiers, parallel spawn patterns, and hard-won gotchas. Use for any delegation: single one-off tasks or parallel fan-out."
 ---
 
-# Herdr subagents: taskflow-first orchestration
+# Herdr subagents: plain subagent orchestration
 
-All subagent work runs through two installed packages, driven from the main session via `fabric_exec`:
+All subagent work runs through **pi-herdr-agents**, driven from the main session via `fabric_exec`:
 
-- **pi-taskflow** (`extensions.taskflow`) — the backbone. Any request spanning multiple phases, multiple items, or repeated patterns becomes a taskflow flow: declarative DAG, tracked runId, resumable, saveable as `/tf:<name>`.
-- **pi-herdr-agents** (`extensions.subagent` + `extensions.subagents_list` / `subagent_interrupt` / `subagent_resume`) — fire-and-forget single delegations in herdr panes. Use ONLY when one delegation with no tracking needs is enough.
+- `extensions.subagent` — spawn a sub-agent in a dedicated herdr pane (or embedded).
+- `extensions.subagents_list` / `subagent_interrupt` / `subagent_resume` — manage running agents.
 
-Core principle: the user describes the outcome; you translate it into a flow. That gives a consistent planner/worker/reviewer shape every time instead of ad-hoc spawns.
+Keep it basic: one agent per task, parallel spawns for fan-out, results steer back to the main session. No DAG runtimes, no flow DSLs.
 
 ## Model roster (user-pinned — always pass explicitly)
 
@@ -20,112 +20,59 @@ Core principle: the user describes the outcome; you translate it into a flow. Th
 | complex | `kimi-coding/kimi-for-coding` | multi-file logic, subtle contracts |
 | ultra | `kimi-coding/k3-256k` | load-bearing design, hard debugging |
 
-Never let a subagent inherit the parent's interactive model silently. In taskflow, set the model per phase via the phase's `agent` choice or flow-level config (`pi-taskflow` agents carry their own runtimes; check `action: "agents"`). For plain subagent calls, pass `model` explicitly.
+Never let a subagent inherit the parent's interactive model silently — pass `model` on every spawn, then verify it took effect in `details.runtimePlan.modelId`.
 
-## Taskflow (the default path)
+## Thinking budget (user preference)
 
-### Call shape
+Default to no/low thinking on every spawn. Well-scoped, concise prompts make extra thinking tokens a liability — they derail more than they help. Only raise thinking for genuinely hard debugging or load-bearing design, and say why when you do.
 
-```ts
-// inside fabric_exec code
-await extensions.taskflow({ action: "verify", defineFile: "/tmp/flow.json" });
-await extensions.taskflow({ action: "plan", defineFile: "/tmp/flow.json" });
-await extensions.taskflow({ action: "run", defineFile: "/tmp/flow.json" });
-```
+Gotcha: supported thinking levels vary per model — `opencode-go/deepseek-v4-flash` accepts only `off`/`high`/`max` (passing `"low"` errors at spawn). Use `thinking: "off"` for flash. Check the error message for a model's supported values if a spawn fails.
 
-### Workflow for every non-trivial request
-
-1. **Author**: write the flow JSON to a tmp file with `pi.write` (e.g. `/tmp/feat-x.json`). Never inline big definitions in the call — `defineFile` lets you edit + re-verify without resending.
-2. **Verify** (`action: "verify"`) — zero tokens; catches cycles, missing `dependsOn`, undefined refs, contract typos. Iterate on the file until clean.
-3. **Plan** (`action: "plan"`) — zero tokens; shows bound/unresolved bindings and worst-case agent-call count. Show the user the plan when the flow is expensive.
-4. **Run** (`action: "run"`) — only the `final: true` phase output returns to your context; intermediate transcripts stay in the runtime.
-5. **Save** reusable flows: `action: "save"` with `define`, then rerun via `{ action: "run", name: "<flow>", args: {...} }` or `/tf:<name>`.
-
-### Minimal flow skeleton (discover → map → gate → report)
-
-```jsonc
-{
-  "name": "example",
-  "budget": { "maxUSD": 2.00 },
-  "phases": [
-    { "id": "discover", "type": "agent", "agent": "scout", "output": "json",
-      "task": "List the items. Output ONLY a JSON array [...].",
-      "expect": { "type": "array" }, "retry": { "max": 2 } },
-    { "id": "work", "type": "map", "over": "{steps.discover.json}", "as": "item",
-      "agent": "worker", "task": "Do the thing for {item}.", "dependsOn": ["discover"] },
-    { "id": "review", "type": "gate", "agent": "reviewer", "output": "json",
-      "expect": { "type": "object", "required": ["verdict"],
-        "properties": { "verdict": { "enum": ["pass", "block"] } } },
-      "task": "Review:\n{steps.work.output}\nRespond ONLY JSON {\"verdict\":\"pass\"|\"block\"}",
-      "dependsOn": ["work"] },
-    { "id": "report", "type": "reduce", "from": ["review"], "agent": "doc-writer",
-      "task": "Summarize:\n{steps.review.output}", "dependsOn": ["review"], "final": true }
-  ]
-}
-```
-
-### Shorthand (skips DSL, still tracked/resumable)
-
-```ts
-await extensions.taskflow({ action: "run", task: "Summarize src/ architecture", agent: "scout" });
-await extensions.taskflow({ action: "run", tasks: [{ task: "Audit auth" }, { task: "Audit validation" }] });
-await extensions.taskflow({ action: "run", chain: [{ task: "List API of src/lib" }, { task: "Write docs for:\n{previous.output}" }] });
-```
-
-### Rules that break flows when ignored
-
-- `dependsOn` is the DAG — phase array order means nothing. Every `{steps.X.*}` ref needs `"dependsOn": ["X"]`.
-- Hyphenated ids and agent names only. Never invent agent names — `await extensions.taskflow({ action: "agents" })` lists them (18 built-ins: executor, scout, planner, analyst, critic, reviewer, security-reviewer, test-engineer, doc-writer, executor-fast, executor-ui, verifier, …).
-- Machine checks before LLM checks: `script` phases (zero tokens) for builds/tests, gate `eval` before gate `task`.
-- Decision phases emit JSON with `expect` contracts (enum verdicts), not free text.
-- Any fan-out gets a `budget`. Any saved flow gets `strictInterpolation: true`.
-- Mark exactly one phase `final: true`.
-- Load the full taskflow skill for deep features (loop/tournament/race/expand, incremental recompute): read `/Users/yash/.pi/agent/npm/node_modules/pi-taskflow/skills/taskflow/SKILL.md`.
-
-### Operating runs
-
-- `/tf runs`, `/tf peek <runId> [phaseId]` — inspect stored phases without pulling transcripts into context.
-- `action: "resume"` with `runId` — forks a failed/paused run, reuses completed phases.
-- `detach: true` on `run` for background; approval phases auto-reject when detached.
-
-## Plain subagent (single one-off delegation only)
+## Spawning
 
 ```ts
 const res = await extensions.subagent({
   name: "slice-name",                 // display name
   task: "…self-contained prompt…",    // paths, context, constraints, expected output
   model: "opencode-go/deepseek-v4-flash",
-  cwd: "/Users/yash/Work/zomunk/toolkit-v2",
+  thinking: "off",                    // default; see "Thinking budget" below (flash supports off/high/max only)
+  cwd: "<absolute path to the repo>",
   // agent: "worker" | "scout" | "reviewer" | ... (pi-herdr-agents roles)
-  // thinking: "low" | "medium" | "high"
   // worktree: { branch: "feat/x", base: "main" }  // for parallel WRITING tasks
 });
 // res.details: { id, sessionFile, status: "started", runtimePlan: { modelId, ... } }
 ```
 
-Hard rules (learned from failures):
+## Hard rules (learned from failures)
 
 - **Fire-and-forget.** The call returns `started` immediately and the harness steers the result back as a wake-up message. NEVER poll, sleep, tail the session file, or call `subagents_list` to "check status" — end your turn and wait for the steer. Never fabricate results after spawning.
-- **Parallel**: call `subagent` multiple times; results steer back independently. Read-only agents share the parent checkout; parallel writers each get a unique `worktree` branch (uncommitted parent changes are NOT copied).
-- **Interrupt**: `await extensions.subagent_interrupt({ id: "<id>" })` (from spawn details) — turn-level cancel, session stays alive.
+- **Parallel fan-out**: call `subagent` multiple times in one `fabric_exec` block; results steer back independently. Read-only agents share the parent checkout; parallel writers each get a unique `worktree` branch (uncommitted parent changes are NOT copied).
+- **Interrupt**: `await extensions.subagent_interrupt({ id: "<id>" })` (id from spawn details) — turn-level cancel, session stays alive.
 - **Resume/help**: a child can `caller_ping` for help; answer with `await extensions.subagent_resume({ sessionPath, message, autoExit: true })`.
-- Verify the model actually took effect in `details.runtimePlan.modelId`.
-- Subagents start blank — prompts must be fully self-contained (exact paths, live-environment facts, constraints: no git commit/push, repo conventions, verification command).
+- **Self-contained prompts.** Subagents start blank — every prompt must carry: exact file paths, live-environment facts (e.g. current herdr pane ids, from `fleet_survey` when relevant), the agent's own name, constraints (no git commit/push, repo conventions), and the verification command if any. Never tell a subagent to run herdr pane discovery itself or to start duplicate dev servers.
 - If a task is really 2 lines, do it yourself — don't spawn.
 
-## Which tool when
+## Workflow loop (the user's core loop)
 
-| Situation | Tool |
-|---|---|
-| Multi-phase, multi-item, or repeatable work | taskflow flow (`verify` → `plan` → `run`) |
-| One-off delegation you want tracked/resumable | taskflow shorthand (`task`/`tasks`/`chain`) |
-| Quick background task, user watching its pane | plain `subagent` |
-| Parallel independent writes | taskflow `map`/`parallel`, or multiple `subagent` with unique worktrees |
-| Human approval mid-flow | taskflow `approval` phase (not detached) |
-| Review/adversarial passes | taskflow `gate`/`tournament` phases (review agents) |
+1. **Scope first.** Read the target files yourself, propose the agent slice (how many agents, which files, which model tier) and get explicit user approval BEFORE spawning.
+2. **Survey before fan-out.** For "look at the whole codebase" requests, spawn ONE scout agent first (read-only, cheapest tier); when its report steers back, review with the user, then spawn one worker per discovered item.
+3. **Spawn** with self-contained prompts and pinned models.
+4. **End turn.** Wait for steer-backs; synthesize results when they arrive.
+5. The user reviews output — do not build review/adversarial agent steps into workflows unless asked.
+
+## Subagent tool discipline (learned from transcript analysis)
+
+Put these rules verbatim in every spawn prompt where the agent will search or read code:
+
+- **Search with structured tools**: `pi.grep` / `pi.find` / `pi.ls` (or `ffgrep`/`fffind` when available) instead of hand-rolled `grep`/`find` via `pi.bash`. Hand-written `grep -E` patterns with literal parens/brackets/\s regularly crash GNU grep (`parentheses not balanced`, `empty (sub)expression`).
+- **If `pi.bash` is unavoidable, always pass `settle: true`** and treat grep exit-1 (no match) as an empty result, not an error. Without `settle`, a no-match grep throws a hard Runtime error.
+- **Never retry a broken grep pattern** — if a search pattern errored once, switch to `pi.grep` (or literal mode) instead of resending a variant of the same pattern.
+- **Read files with `pi.read`, never `cat`/`sed` through `pi.bash`** (repo rule; also pi.read's section view replaces `sed -n` line ranges).
+- Evidence: in a 5-subagent transcript audit, the only agent with zero friction on risky greps used `settle: true` everywhere; the cleanest agents used `pi.grep`/`pi.read` exclusively. Model tier was not the differentiator.
 
 ## Standing rules (user)
 
 - Only the orchestrator (main session) or the user runs git commit/push. Subagents never commit — put it in every prompt.
 - Spawn subagents only when the user explicitly asks; the user dictates the slice and model tier.
 - Review of subagent output is the user's job — no review/adversarial steps unless requested.
+- No emojis anywhere.

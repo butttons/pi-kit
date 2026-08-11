@@ -101,7 +101,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **playwright-cli** | Browser automation command reference for playwright-cli.                                         |
 | **pi-costs**       | Analyze pi session costs, token usage, and statistics.                                           |
 | **tanstack-start** | Build full-stack React apps with TanStack Start: routing, server functions, middleware, deployment. |
-| **herdr-pi-subagents** | Taskflow-first subagent orchestration in herdr: pi-taskflow (/tf) as the backbone for multi-phase flows (verify, plan, run, resume, save), plain pi-herdr-agents subagent for one-off delegations, with pinned model tiers. |
+| **herdr-pi-subagents** | Plain subagent orchestration in herdr via pi-herdr-agents: fabric_exec call shapes, parallel fan-out, pinned model tiers, and the survey-then-fan-out workflow loop. |
 
 ## Themes
 
