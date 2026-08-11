@@ -54,6 +54,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                                        |
 | **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                                               |
 | **lazy-agents**        | Loads AGENTS.md files on demand as the agent touches directories within the project. Avoids context bloat from loading all project rules upfront.        |
+| **fleet**              | First-class subagent orchestration over [herdr](https://herdr.dev): dispatch named pi rpc-mode agents into labeled workspaces with explicit model tiers, poll status, watch live session activity, harvest final reports. Also includes find_threads / read_thread for past-session recall. |
 
 ### UI
 
