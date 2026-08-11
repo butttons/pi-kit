@@ -54,7 +54,6 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                                        |
 | **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                                               |
 | **lazy-agents**        | Loads AGENTS.md files on demand as the agent touches directories within the project. Avoids context bloat from loading all project rules upfront.        |
-| **fleet**              | First-class subagent orchestration over [herdr](https://herdr.dev): dispatch named pi rpc-mode agents into labeled workspaces with explicit model tiers, poll status, watch live session activity, harvest final reports. Also includes find_threads / read_thread for past-session recall. |
 
 ### UI
 
@@ -102,7 +101,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **playwright-cli** | Browser automation command reference for playwright-cli.                                         |
 | **pi-costs**       | Analyze pi session costs, token usage, and statistics.                                           |
 | **tanstack-start** | Build full-stack React apps with TanStack Start: routing, server functions, middleware, deployment. |
-| **herdr-pi-subagents** | Orchestrate named pi rpc-mode subagents in herdr panes: spawn with per-slice models, prompt via JSON frames, status waits, live session-JSONL visibility, workspace grouping and cleanup. |
+| **herdr-pi-subagents** | Taskflow-first subagent orchestration in herdr: pi-taskflow (/tf) as the backbone for multi-phase flows (verify, plan, run, resume, save), plain pi-herdr-agents subagent for one-off delegations, with pinned model tiers. |
 
 ## Themes
 
