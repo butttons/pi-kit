@@ -145,6 +145,36 @@ await extensions.subagent_resume({
 
 The recovery message is deliberately generic — the agent re-reads the repo state and reconciles against its own transcript. Add specifics only when you know exactly which step failed.
 
+## Coordinating LIVE agents: intercom, never resume
+
+`subagent_resume` on a RUNNING agent spawns a second session copy (user caught this; the resume-session then competes with the original). Resume is strictly a recovery tool for DEAD sessions. To steer running agents, use pi-intercom:
+
+- Discover live agents: `extensions.intercom({ action: "list" })` — spawned agents appear as `subagent-chat-<uuid>`; status column shows `thinking` / `tool:<name>` / `idle` (use it to distinguish "stuck" from "working" before intervening).
+- Broadcast a coordination note: `extensions.intercom({ action: "send", to: "<short-id>", message })` per target, fire-and-forget.
+- Agents can escalate back via `contact_supervisor` — answer with `intercom({ action: "reply", ... })`.
+
+## Parallel writers on a SHARED stateful backend
+
+Worktree isolation breaks when the task exercises shared live state (local D1, dev servers) that exists only in the main checkout — a worktree's `--persist-to` state is a different database than the one running servers read. For e2e/test-writing fan-outs:
+
+- Spawn writers in the MAIN checkout, each owning a disjoint folder (`e2e/<domain>/`), with an explicit forbidden-files list (shared config, helpers, fixtures).
+- Warn workers in the prompt that N agents share one backend and any global-setup/seed step races: "if state briefly vanishes mid-run, re-run once before debugging." An identical-content reseed makes these races benign.
+- A crashed shared server looks like mass test failure (all domains timing out at once). Tell workers: on en-masse failure, STOP and report; the orchestrator checks server panes (herdr) and restarts.
+
+## Long verification commands exceed tool timeouts
+
+Full-suite runs often exceed the 2-minute fabric_exec/bash ceiling. Put this in worker prompts for long verifications: run with output redirected (`nohup pnpm e2e > /tmp/run.log 2>&1 &`) and poll the file with `sleep` + `tail`, never block on the command itself.
+
+## Planner → plan files → worker fan-out (proven pattern)
+
+For multi-domain build-outs, one planner agent writing `plans/<domain>.md` (pinned fixture rows, source-verified selectors with evidence quotes, skip lists) then one worker per plan file produced 88/88 implementable cases in one pass. Keys: the planner must quote evidence from the real source for every selector it prescribes, the orchestrator spot-checks 1-2 claims before fan-out, and workers report plan deviations back so plans get a corrections appendix (documentation scribe pass).
+
+## Recovery protocol for dead agents
+
+1. Read the session transcript tail yourself (path in the failure notice) to see what completed.
+2. `subagent_resume({ sessionPath, message, autoExit: true })` with a targeted "continue from X" message — resume preserves progress; provider stream errors ("Stream ended without finish_reason") recover cleanly this way.
+3. Respawn fresh only when the transcript shows the session is unsalvageable.
+
 ## Standing rules (user)
 
 - Only the orchestrator (main session) or the user runs git commit/push. Subagents never commit — put it in every prompt.
