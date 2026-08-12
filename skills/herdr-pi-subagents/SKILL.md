@@ -82,6 +82,13 @@ TOOLING (fabric_exec sandbox):
 
 Rules: name only the tools the task actually needs, with VERIFIED semantics (smoke-test a tool yourself before baking its args into prompts). Discovery (tools.search) is a one-time-per-session bridge — tell the agent that explicitly so it doesn't treat "Cannot find name" as a blocker.
 
+Also bake these traps into every primer (all observed biting real subagents):
+
+- **Quote `$` paths in bash**: `z.$org/...`-style contract paths must be single-quoted (`'z.$org/...'`) — the shell expands `$org` to empty and the command silently hits the wrong path.
+- **Always `await` pi.* tools**: an unawaited `pi.read(...)` returns `{}` (a pending promise), and the agent then "reads" an empty object and invents the rest. Every pi.* call is async.
+- **`π.*` needs the `strings` param**: `π.<key>` only resolves when the spawn's fabric_exec call passes that key via `strings: { key: "..." }`. For large prompt payloads (plans, diffs, checklists), pass them through `strings` and reference `π.<key>` in code — never inline-megabyte template literals.
+- **`pi.read` options are `offset`/`limit`, not `length`** — passing `length` silently returns the whole file.
+
 ## Reading other sessions — pi-threads first
 
 When an agent (or the orchestrator) needs data from other sessions — audits, recalling past decisions, checking a subagent's transcript — use the pi-threads tools, not raw JSONL parsing:
@@ -108,11 +115,35 @@ Fire-and-forget means no polling for COMPLETION, but DO watch running agents for
 - **Cadence**: every few minutes, `herdr pane read <pane-id> --source recent-unwrapped --lines 50` on each running subagent pane (get pane ids from the spawn acknowledgement or `herdr pane list`).
 - **Denial/retry loops are the top token-burner — detect them in the first minutes, not after 10.** Signature in the pane tail: the badge reads `N tools · N denied` and the same tool calls reappear with climbing call ids and no new information between them. A denied tool call retried verbatim even ONCE is a red flag; twice = kill it (`subagent_interrupt`), respawn bare with explicit thinking, and adjust the prompt (name the exact tools it has). This failure mode burns the entire session's tokens if unwatched.
 - **A confident completion is not proof of work — fabricated results are a real failure mode.** Observed: a probe returned a rich, correct-looking report (file paths, quoted file contents, import graphs) with ZERO tool calls in its transcript — it invented the whole session inline, and a downstream worker then had to "correct the false premise". When a steer-back makes concrete factual claims (file contents, line numbers), spot-check one claim against the transcript's toolCall list before trusting it; zero toolCalls + detailed report = fabricated, redo the task with "verify against reality" emphasized in the prompt.
+- **Tool calls are not proof either — spot-check VARIATION, not just existence.** Second observed fabrication mode: every claim is "backed" by a tool call, but all calls share the same flawed pattern (e.g. grepping a term that cannot match the real code, then reporting whatever the miss implies). One call shape, wrong premise, confident conclusions. When reviewing evidence, check that the agent varied its queries/reads enough to have actually seen the thing it describes.
+- **"Pre-existing failure" claims must be proven against HEAD.** Observed: a worker broke generated types (`cf-typegen` output), typecheck failed, and it dismissed the failure as pre-existing without checking. Rule for every agent prompt that runs verification: before claiming a failure pre-dates your change, prove it with `git show HEAD:<path>` / `git stash` + rerun. No baseline, no dismissal.
 - **The other anomaly is semantic, not silence**: the agent is stuck on ONE sub-problem across 3-4+ turns without progress — e.g. typecheck fails, fix, fails the same way, fix, fails again; or re-attempting the same edit/command with cosmetic variations. Output volume is irrelevant; an agent can be busy and still be spinning. When you read a pane, ask: "what is it trying to solve right now, and how many turns has it spent on exactly that?"
 - **Response ladder**:
   1. `subagent_resume({ sessionPath, message })` with a corrective steer (cheap, keeps progress).
   2. `subagent_interrupt({ id })` then resume, or respawn fresh at a higher thinking level (costs in-flight progress).
   3. **Thinking-level bumps on a LIVE session are a TUI-only lever** — the orchestrator cannot change model/thinking mid-run (`subagent_resume` has no such param). Ping the user: "agent X is stuck, bump its thinking in the pane" (user steers panes directly).
+
+## Planner self-consistency gate (plan-verifier prompts)
+
+Meta-analysis of a 10-transcript batch: 75% of reviewer-caught bugs traced to PLAN inconsistencies, not worker sloppiness — e.g. a plan prescribing state `string | null` while its own resolution path needed `"all"` in state; a plan naming two different production datasets in two sections. Workers faithfully implement self-contradicting plans.
+
+Every planner/plan-verifier prompt must include this gate verbatim:
+
+> Before returning the plan, symbol-trace every prescription: for each value a downstream step references (enum member, sentinel, field name, dataset, file path), confirm an upstream step in THIS SAME PLAN actually produces or defines it. If the resolution reads a value no setter writes, or section B names a different artifact than section A, fix the plan before submitting.
+
+## Resume template
+
+When a steer-back dies mid-task or an agent must continue after an interrupt, resume — do not respawn from scratch:
+
+```ts
+await extensions.subagent_resume({
+  sessionPath: "<absolute .jsonl path from spawn details>",
+  message: "Check the working tree first, continue from where you left off.",
+  autoExit: true,
+});
+```
+
+The recovery message is deliberately generic — the agent re-reads the repo state and reconciles against its own transcript. Add specifics only when you know exactly which step failed.
 
 ## Standing rules (user)
 
