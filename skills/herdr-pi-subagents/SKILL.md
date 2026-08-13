@@ -193,6 +193,10 @@ Review-agent workflow (bake into the prompt verbatim):
 
 Reviewers are read-only: they comment and report, they never edit. Fixes are a separate step (small fixes by the orchestrator, big ones via a fixer agent).
 
+## calldiff — structural behavior check (use before hunk review)
+
+For PRs that claim behavior preservation (refactors, unification passes), run `calldiff diff <base>...<branch>` (scope with pathspecs to the changed app/package) BEFORE the hunk-level review. The call-stack diff should be near-empty: same entrypoints, same call paths, fewer intermediate layers. A vanished call path means a behavior was dropped (e.g. a mutation no longer wired); a brand-new path to a sensitive sink (network, DB, redirect) means scope creep. Investigate either in the hunk review. calldiff is also an MCP server and has agent skills (`calldiff skills` / `calldiff mcp`) if deeper reach/tree queries are needed (`calldiff reach` from an entrypoint to a suspect symbol). Output is LLM-oriented — use `--format md` or `--token-limit` on big diffs.
+
 ## Standing rules (user)
 
 - Only the orchestrator (main session) or the user runs git commit/push. Subagents never commit — put it in every prompt.
