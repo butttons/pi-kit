@@ -10,7 +10,7 @@
  * Multiple expansions in one prompt work too:
  *   Compare $`cat old.ts` with $`cat new.ts`
  */
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const SHELL_PATTERN = /\$`([^`]+)`/g;
 

@@ -1,17 +1,18 @@
 {
   "name": "pi-kit",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Personal pi extensions, skills, prompts, and themes",
   "author": "Yash (https://github.com/butttons)",
   "keywords": [
     "pi-package"
   ],
   "peerDependencies": {
-    "@mariozechner/pi-agent-core": "*",
-    "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-tui": "*",
-    "@sinclair/typebox": "*"
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "@sinclair/typebox": "*",
+    "pi-fabric": "*"
   },
   "pi": {
     "extensions": [

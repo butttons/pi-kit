@@ -112,7 +112,7 @@ Put these rules verbatim in every spawn prompt where the agent will search or re
 
 Fire-and-forget means no polling for COMPLETION, but DO watch running agents for stalls when work is in flight:
 
-- **Cadence**: every few minutes, `herdr pane read <pane-id> --source recent-unwrapped --lines 50` on each running subagent pane (get pane ids from the spawn acknowledgement or `herdr pane list`).
+- **Cadence (user rule)**: check each running subagent every 10 minutes minimum (`herdr pane read <pane-id> --source recent-unwrapped --lines 50`; pane ids from the spawn acknowledgement or `herdr pane list`). If 30 minutes pass without a steer-back or visible progress, investigate for sure — read the pane, diagnose the stall, and decide: corrective `subagent_resume` steer, interrupt + respawn, or escalate to the user.
 - **Denial/retry loops are the top token-burner — detect them in the first minutes, not after 10.** Signature in the pane tail: the badge reads `N tools · N denied` and the same tool calls reappear with climbing call ids and no new information between them. A denied tool call retried verbatim even ONCE is a red flag; twice = kill it (`subagent_interrupt`), respawn bare with explicit thinking, and adjust the prompt (name the exact tools it has). This failure mode burns the entire session's tokens if unwatched.
 - **A confident completion is not proof of work — fabricated results are a real failure mode.** Observed: a probe returned a rich, correct-looking report (file paths, quoted file contents, import graphs) with ZERO tool calls in its transcript — it invented the whole session inline, and a downstream worker then had to "correct the false premise". When a steer-back makes concrete factual claims (file contents, line numbers), spot-check one claim against the transcript's toolCall list before trusting it; zero toolCalls + detailed report = fabricated, redo the task with "verify against reality" emphasized in the prompt.
 - **Tool calls are not proof either — spot-check VARIATION, not just existence.** Second observed fabrication mode: every claim is "backed" by a tool call, but all calls share the same flawed pattern (e.g. grepping a term that cannot match the real code, then reporting whatever the miss implies). One call shape, wrong premise, confident conclusions. When reviewing evidence, check that the agent varied its queries/reads enough to have actually seen the thing it describes.
@@ -174,6 +174,24 @@ For multi-domain build-outs, one planner agent writing `plans/<domain>.md` (pinn
 1. Read the session transcript tail yourself (path in the failure notice) to see what completed.
 2. `subagent_resume({ sessionPath, message, autoExit: true })` with a targeted "continue from X" message — resume preserves progress; provider stream errors ("Stream ended without finish_reason") recover cleanly this way.
 3. Respawn fresh only when the transcript shows the session is unsalvageable.
+
+## Hunk-based review agents (adversarial diff review)
+
+When the user asks for a review pass over a worker's changes and a Hunk session is involved, drive it through the hunk daemon CLI — NEVER run interactive hunk commands (`hunk diff`, `hunk show`) from an agent; the TUI belongs to the user. Bundled usage skill: `hunk skill path`.
+
+Orchestrator pre-check: `hunk session list --json` to confirm a live session exists for the repo (user launches it, e.g. in a herdr pane). If none, tell the user to start `hunk diff` first — do not spawn the reviewer blind.
+
+Review-agent workflow (bake into the prompt verbatim):
+
+1. `hunk session reload --repo <abs-repo-path> -- diff` — refresh the live session so it shows the worker's fresh changes, not a stale snapshot. The session does NOT auto-reload.
+2. `hunk session review --repo <abs-repo-path> --include-patch --json` — structured file/hunk list plus raw diff text. Omit `--include-patch` for a structure-only first pass on large diffs.
+3. Read the changed files in full with pi.read before judging a hunk — diff context alone fabricates "bugs" that the surrounding code already handles.
+4. Report findings back in the steer-back AND drop them inline for the user in one batch:
+   `printf '%s' '{"comments":[{"filePath":"...", "newLine":N, "summary":"...", "rationale":"..."}]}' | hunk session comment apply --repo <abs-repo-path> --stdin`
+   Use `newLine` for added/changed lines, `oldLine` for deletions. Keep summaries one sentence; rationale carries the why.
+5. If the session vanished mid-review (user closed it), fall back to `git diff` for the analysis and return findings as text — never block on the daemon.
+
+Reviewers are read-only: they comment and report, they never edit. Fixes are a separate step (small fixes by the orchestrator, big ones via a fixer agent).
 
 ## Standing rules (user)
 
