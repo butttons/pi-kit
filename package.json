@@ -1,6 +1,6 @@
 {
   "name": "pi-kit",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Personal pi extensions, skills, prompts, and themes",
   "author": "Yash (https://github.com/butttons)",
   "keywords": [
@@ -24,5 +24,8 @@
     "themes": [
       "./themes"
     ]
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
   }
 }

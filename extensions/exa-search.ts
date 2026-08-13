@@ -7,7 +7,15 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
-import { Type } from "@sinclair/typebox";
+import { Type, type TSchema } from "@sinclair/typebox";
+
+/**
+ * StringEnum returns a schema from the newer "typebox" package whose brand
+ * does not match @sinclair/typebox's TSchema at the type level. Runtime shape
+ * is identical, so we bridge with a cast.
+ */
+const stringEnum = <T extends readonly string[]>(values: T): TSchema =>
+  StringEnum(values) as unknown as TSchema;
 
 const SearchParams = Type.Object({
   query: Type.String({ description: "Search query" }),
@@ -18,10 +26,10 @@ const SearchParams = Type.Object({
     }),
   ),
   search_type: Type.Optional(
-    StringEnum(["fast", "auto", "deep", "deep-reasoning"] as const),
+    stringEnum(["fast", "auto", "deep", "deep-reasoning"] as const),
   ),
   category: Type.Optional(
-    StringEnum([
+    stringEnum([
       "company",
       "news",
       "research paper",

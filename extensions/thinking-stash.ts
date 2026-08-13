@@ -67,7 +67,7 @@ export default function thinkingStash(pi: ExtensionAPI) {
 		reset({ ctx });
 	});
 
-	pi.on("session_switch", async (_event, ctx) => {
+	pi.on("session_before_switch", async (_event, ctx) => {
 		reset({ ctx });
 	});
 

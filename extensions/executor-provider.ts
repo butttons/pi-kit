@@ -245,7 +245,8 @@ export default function executorProviderExtension(pi: ExtensionAPI) {
   };
 
   register();
-  pi.events.on(FABRIC_PROVIDER_DISCOVER_EVENT, (event: FabricProviderDiscovery) => {
+  pi.events.on(FABRIC_PROVIDER_DISCOVER_EVENT, (data: unknown) => {
+    const event = data as FabricProviderDiscovery;
     event.register(provider, { overwrite: true });
   });
 }
