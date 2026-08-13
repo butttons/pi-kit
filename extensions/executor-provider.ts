@@ -181,12 +181,13 @@ const provider: FabricProvider = {
       case "search": {
         const params = new URLSearchParams();
         params.set("query", String(args.query ?? ""));
-        if (typeof args.integration === "string") {
-          params.set("integration", args.integration);
-        }
-        const tools = (await executorFetch({
+        const all = (await executorFetch({
           path: `/tools?${params.toString()}`,
         })) as ExecutorToolEntry[];
+        const tools =
+          typeof args.integration === "string"
+            ? all.filter((tool) => tool.integration === args.integration)
+            : all;
         const limit = typeof args.limit === "number" ? args.limit : 15;
         return tools.slice(0, limit).map((tool) => ({
           address: tool.address,
