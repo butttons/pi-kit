@@ -1,7 +1,7 @@
 /**
  * opencode-usage extension
  *
- * Adds a /usage command that queries the opencode zen usage endpoint and
+ * Adds a /usage command that queries the opencode go usage endpoint and
  * reports rolling, weekly, and monthly consumption. The API key is resolved
  * through pi's model registry (no auth files are read directly).
  */
@@ -39,7 +39,7 @@ function formatWindow({ name, window }: { name: string; window: UsageWindow }): 
 
 export default function (pi: ExtensionAPI) {
 	pi.registerCommand("usage", {
-		description: "Query opencode zen usage (rolling/weekly/monthly)",
+		description: "Query opencode go usage (rolling/weekly/monthly)",
 		handler: async (_args, ctx) => {
 			const apiKey = await ctx.modelRegistry.getApiKeyForProvider(PROVIDER);
 			if (!apiKey) {
@@ -84,7 +84,7 @@ export default function (pi: ExtensionAPI) {
 			const { rolling, weekly, monthly } = data.usage;
 			ctx.ui.notify(
 				[
-					"opencode zen usage",
+					"opencode go usage",
 					formatWindow({ name: "Rolling", window: rolling }),
 					formatWindow({ name: "Weekly", window: weekly }),
 					formatWindow({ name: "Monthly", window: monthly }),
