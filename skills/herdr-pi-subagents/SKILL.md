@@ -175,6 +175,17 @@ For multi-domain build-outs, one planner agent writing `plans/<domain>.md` (pinn
 2. `subagent_resume({ sessionPath, message, autoExit: true })` with a targeted "continue from X" message — resume preserves progress; provider stream errors ("Stream ended without finish_reason") recover cleanly this way.
 3. Respawn fresh only when the transcript shows the session is unsalvageable.
 
+## Mid-run steering via pi-intercom
+
+When a running subagent needs guidance (stuck, heading the wrong way, or missing orchestrator-only context), steer it live instead of waiting for failure:
+
+1. Read its herdr pane first to confirm it is actually stuck, not mid-work: `herdr pane list --workspace <id>`, then `herdr pane read <pane> --source recent`.
+2. Find its session via `intercom({ action: "list" })` — subagent sessions show up named `subagent-chat-*`; identify by model and live status.
+3. Send a fire-and-forget steer: `intercom({ action: "send", to: <session>, message })`. Keep steers one-way and dense: the context the agent cannot know (cross-agent decisions, conventions, what changed elsewhere on the branch) plus reminders (pathspec commits, escalation rules).
+4. Never use `ask` from the orchestrator — do not block a turn waiting on a reply; the agent picks the message up at its next turn boundary. Agents can escalate TO the orchestrator via `contact_supervisor` when pi-subagents supplied bridge metadata.
+
+See the `pi-intercom` skill for the full pattern set (ask/reply, broadcast, attachments).
+
 ## Hunk-based review agents (adversarial diff review)
 
 When the user asks for a review pass over a worker's changes and a Hunk session is involved, drive it through the hunk daemon CLI — NEVER run interactive hunk commands (`hunk diff`, `hunk show`) from an agent; the TUI belongs to the user. Bundled usage skill: `hunk skill path`.
