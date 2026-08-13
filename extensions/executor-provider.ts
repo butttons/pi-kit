@@ -179,15 +179,48 @@ const provider: FabricProvider = {
   async invoke(actionName, args) {
     switch (actionName) {
       case "search": {
-        const params = new URLSearchParams();
-        params.set("query", String(args.query ?? ""));
-        const all = (await executorFetch({
-          path: `/tools?${params.toString()}`,
-        })) as ExecutorToolEntry[];
+        /**
+         * Daemon search is phrase-based and misses multiword queries whose
+         * words are joined by underscores in tool names ("get issue" vs
+         * "get_issue"). Tokenize, search each token, and rank addresses by
+         * how many tokens matched.
+         */
+        const tokens = String(args.query ?? "")
+          .split(/[\s_]+/)
+          .map((token) => token.trim())
+          .filter((token) => token.length > 1);
+        const perToken = await Promise.all(
+          (tokens.length > 0 ? tokens : [String(args.query ?? "")]).map(
+            async (token) => {
+              const params = new URLSearchParams();
+              params.set("query", token);
+              return (await executorFetch({
+                path: `/tools?${params.toString()}`,
+              })) as ExecutorToolEntry[];
+            },
+          ),
+        );
+        const byAddress = new Map<
+          string,
+          { tool: ExecutorToolEntry; score: number }
+        >();
+        for (const results of perToken) {
+          for (const tool of results) {
+            const existing = byAddress.get(tool.address);
+            if (existing) {
+              existing.score += 1;
+            } else {
+              byAddress.set(tool.address, { tool, score: 1 });
+            }
+          }
+        }
+        const ranked = [...byAddress.values()]
+          .sort((a, b) => b.score - a.score)
+          .map((entry) => entry.tool);
         const tools =
           typeof args.integration === "string"
-            ? all.filter((tool) => tool.integration === args.integration)
-            : all;
+            ? ranked.filter((tool) => tool.integration === args.integration)
+            : ranked;
         const limit = typeof args.limit === "number" ? args.limit : 15;
         return tools.slice(0, limit).map((tool) => ({
           address: tool.address,
