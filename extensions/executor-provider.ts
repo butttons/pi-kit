@@ -200,6 +200,7 @@ const provider: FabricProvider = {
             },
           ),
         );
+        const normalizedQuery = tokens.join("_").toLowerCase();
         const byAddress = new Map<
           string,
           { tool: ExecutorToolEntry; score: number }
@@ -211,6 +212,16 @@ const provider: FabricProvider = {
               existing.score += 1;
             } else {
               byAddress.set(tool.address, { tool, score: 1 });
+            }
+          }
+        }
+        if (normalizedQuery.length > 0) {
+          for (const entry of byAddress.values()) {
+            const name = entry.tool.name.toLowerCase();
+            if (name === normalizedQuery) {
+              entry.score += 100;
+            } else if (name.includes(normalizedQuery)) {
+              entry.score += 10;
             }
           }
         }
