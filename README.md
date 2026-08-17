@@ -66,6 +66,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | Extension      | Description                                                                                                                                                             |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **dora**       | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                                     |
+| **executor-provider** | Fabric provider that bridges the local [Executor](https://github.com/flowglad/executor) daemon (`http://localhost:4789`) into pi as `executor.search` / `executor.describe` / `executor.call` tools. Reads the daemon connection from `~/.executor`. |
 | **exa-search** | Web search via [Exa AI](https://exa.ai). Set `EXA_API_KEY`, then use `exa_search` tool for real-time web search with highlights.                                        |
 | **opencode-usage** | `/usage` command that queries the opencode go usage endpoint (rolling/weekly/monthly). Uses the `opencode-go` provider key from pi auth.                              |
 | **command-code** | Registers the [Command Code](https://commandcode.ai/provider) provider API: live-fetches the model list and exposes it as `command-code` (OpenAI-compatible) and `command-code-anthropic` (Claude models). Uses the `command-code` key from pi auth. |
@@ -87,7 +88,6 @@ After install, run `pi config` to enable/disable individual resources from the T
 | Skill              | Description                                                                                            |
 | ------------------ | ------------------------------------------------------------------------------------------------------ |
 | **wrangler-ops**   | Operational patterns for Wrangler CLI: deploy, D1 migrations, queries, R2 management, type generation. |
-| **pocketbase** | PocketBase backend work: collections, records, auth, realtime, files, hooks, migrations, and the JS/Go SDKs. |
 
 ### Knowledge
 
