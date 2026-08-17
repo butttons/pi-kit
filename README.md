@@ -68,6 +68,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **dora**       | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                                     |
 | **exa-search** | Web search via [Exa AI](https://exa.ai). Set `EXA_API_KEY`, then use `exa_search` tool for real-time web search with highlights.                                        |
 | **opencode-usage** | `/usage` command that queries the opencode go usage endpoint (rolling/weekly/monthly). Uses the `opencode-go` provider key from pi auth.                              |
+| **command-code** | Registers the [Command Code](https://commandcode.ai/provider) provider API: live-fetches the model list and exposes it as `command-code` (OpenAI-compatible) and `command-code-anthropic` (Claude models). Uses the `command-code` key from pi auth. |
 
 ## Skills
 
