@@ -21,9 +21,13 @@ Keep it basic: one agent per task, parallel spawns for fan-out, results steer ba
 
 | Tier | Model | When |
 |---|---|---|
-| default | `opencode-go/deepseek-v4-flash` (thinking `max`) | all work unless escalated — 6-for-6 on real tasks 2026-08-11 |
-| complex | `kimi-coding/kimi-for-coding` | when deepseek flakes (DSML dump) or contracts get subtle |
-| ultra | `kimi-coding/k3-256k` | load-bearing design, hard debugging |
+| default | `opencode-go/mimo-v2.5` | all subagent work (user-pinned 2026-08-17) |
+| complex | `opencode-go/mimo-v2.5-pro` | heavier tasks within the mimo family |
+| backup | `opencode-go/deepseek-v4-flash` (thinking `max`) | when mimo flakes or is unavailable |
+| backup+ | `opencode-go/deepseek-v4-pro` | backup for complex work |
+| legacy | `kimi-coding/kimi-for-coding`, `kimi-coding/k3-256k` | previous roster; only if the user asks |
+
+Thinking levels for the mimo models are unverified — on first spawns use the thinking cascade (try `max`, fall back per the spawn error message) and record the working level here.
 
 Never let a subagent inherit the parent's interactive model silently — pass `model` on every spawn, then verify it took effect in `details.runtimePlan.modelId`.
 
@@ -52,7 +56,7 @@ const res = await extensions.subagent({
 
 ## Hard rules (learned from failures)
 
-- **Fire-and-forget.** The call returns `started` immediately and the harness steers the result back as a wake-up message. NEVER poll, sleep, tail the session file, or call `subagents_list` to "check status" — end your turn and wait for the steer. Never fabricate results after spawning.
+- **Fire-and-forget AFTER the liveness gate.** The call returns `started` immediately — that only means the launch was dispatched, not that the agent booted. Complete the liveness gate (below) for every spawned agent BEFORE ending your turn, then wait for steer-backs. NEVER poll, sleep, tail the session file, or call `subagents_list` to "check status" beyond that gate. Steer-backs fire ONLY on completion — a silently dead agent sends nothing, ever. Never fabricate results after spawning.
 - **Parallel fan-out**: call `subagent` multiple times in one `fabric_exec` block; results steer back independently. Read-only agents share the parent checkout; parallel writers each get a unique `worktree` branch (uncommitted parent changes are NOT copied).
 - **Interrupt**: `await extensions.subagent_interrupt({ id: "<id>" })` (id from spawn details) — turn-level cancel, session stays alive.
 - **Resume/help**: a child can `caller_ping` for help; answer with `await extensions.subagent_resume({ sessionPath, message, autoExit: true })`.
@@ -108,11 +112,25 @@ Put these rules verbatim in every spawn prompt where the agent will search or re
 - **Read files with `pi.read`, never `cat`/`sed` through `pi.bash`** (repo rule; also pi.read's section view replaces `sed -n` line ranges).
 - Evidence: in a 5-subagent transcript audit, the only agent with zero friction on risky greps used `settle: true` everywhere; the cleanest agents used `pi.grep`/`pi.read` exclusively. Model tier was not the differentiator.
 
+## Liveness gate (MANDATORY after every spawn)
+
+A spawn acknowledgement is not a running agent. Observed: six agents reported `started` while their launch commands were mangled by an oh-my-zsh update prompt in the fresh panes (`bash ...` typed, prompt ate the first character, `zsh: command not found: ash`) — and zero steer-backs arrived for hours, because dead agents never notify.
+
+After spawning, before ending the turn, run ONE delayed liveness pass (60-90s) covering every spawned agent:
+
+1. Session file exists: the `.jsonl` path from spawn details has been created on disk.
+2. Activity advancing: `<artifacts>/subagent-activity/<id>.json` shows `phase: "active"` with an increasing `sequence`, or the pane status bar shows tokens/tool calls moving.
+3. Pane read-back shows the launch command landed INTACT and the agent TUI booted — this is the check that catches shell-prompt interference. Prefer plain `herdr pane read <pane-id> | tail`; `--source recent` has returned empty on live panes.
+
+Any agent failing the gate: relaunch its tracked launch script in the same pane — `herdr pane run <pane> "bash '<launchScriptFile from spawn details>'"` — which preserves the session path and steer-back tracking. Respawn fresh only when the session is unsalvageable. Same recovery for stalls detected later: activity `sequence` unchanged across two checks while peers advance = interrupt (`subagent_interrupt`) and relaunch the script.
+
+Prevention: pty surfaces used for typed launches must be prompt-free — disable shell update naggers/wizards globally (this machine: `zstyle ':omz:update' mode disabled` in `~/.zshrc`).
+
 ## Monitoring and anomaly escalation
 
 Fire-and-forget means no polling for COMPLETION, but DO watch running agents for stalls when work is in flight:
 
-- **Cadence (user rule)**: check each running subagent every 10 minutes minimum (`herdr pane read <pane-id> --source recent-unwrapped --lines 50`; pane ids from the spawn acknowledgement or `herdr pane list`). If 30 minutes pass without a steer-back or visible progress, investigate for sure — read the pane, diagnose the stall, and decide: corrective `subagent_resume` steer, interrupt + respawn, or escalate to the user.
+- **Cadence (user rule)**: check each running subagent every 10 minutes minimum, and on EVERY wake-up check ALL agents, not just the one that steered back (activity files under `<artifacts>/subagent-activity/`, or `herdr pane read <pane-id> | tail` — pane ids from the spawn acknowledgement or `herdr pane list`). Never enforce cadence with blocking sleeps inside a turn: incoming messages cancel long fabric_exec calls and stall harvesting. Monitoring is event-driven: wake up, check everything, act, end turn. If 30 minutes pass without a steer-back or visible progress, investigate for sure — read the pane, diagnose the stall, and decide: corrective `subagent_resume` steer, interrupt + respawn, or escalate to the user.
 - **Denial/retry loops are the top token-burner — detect them in the first minutes, not after 10.** Signature in the pane tail: the badge reads `N tools · N denied` and the same tool calls reappear with climbing call ids and no new information between them. A denied tool call retried verbatim even ONCE is a red flag; twice = kill it (`subagent_interrupt`), respawn bare with explicit thinking, and adjust the prompt (name the exact tools it has). This failure mode burns the entire session's tokens if unwatched.
 - **A confident completion is not proof of work — fabricated results are a real failure mode.** Observed: a probe returned a rich, correct-looking report (file paths, quoted file contents, import graphs) with ZERO tool calls in its transcript — it invented the whole session inline, and a downstream worker then had to "correct the false premise". When a steer-back makes concrete factual claims (file contents, line numbers), spot-check one claim against the transcript's toolCall list before trusting it; zero toolCalls + detailed report = fabricated, redo the task with "verify against reality" emphasized in the prompt.
 - **Tool calls are not proof either — spot-check VARIATION, not just existence.** Second observed fabrication mode: every claim is "backed" by a tool call, but all calls share the same flawed pattern (e.g. grepping a term that cannot match the real code, then reporting whatever the miss implies). One call shape, wrong premise, confident conclusions. When reviewing evidence, check that the agent varied its queries/reads enough to have actually seen the thing it describes.
