@@ -21,7 +21,7 @@ Keep it basic: one agent per task, parallel spawns for fan-out, results steer ba
 
 | Tier | Model | When |
 |---|---|---|
-| default | `opencode-go/mimo-v2.5` | all subagent work (user-pinned 2026-08-17) |
+| default | `command-code/xiaomi/mimo-v2.5` | all subagent work (user-pinned 2026-08-17) — slices must be concise and concrete; mimo workers are cheap/fast/literal |
 | complex | `opencode-go/mimo-v2.5-pro` | heavier tasks within the mimo family |
 | backup | `opencode-go/deepseek-v4-flash` (thinking `max`) | when mimo flakes or is unavailable |
 | backup+ | `opencode-go/deepseek-v4-pro` | backup for complex work |
