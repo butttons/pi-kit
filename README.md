@@ -1,112 +1,23 @@
 # pi-kit
 
-Personal [pi](https://pi.dev) extensions, skills, and themes.
+Personal [pi](https://pi.dev) extensions, pi-specific skills, and themes.
+
+Universal, harness-agnostic skills (git workflows, obi, playwright-cli, dora, exe-dev, ...) live in [agents.dotfiles](https://github.com/butttons/agents.dotfiles) and are loaded directly by every harness — they are no longer part of this package. pi-kit keeps only what is pi-specific (`herdr-pi-subagents`, `pi-costs`).
 
 ## Install
-
-Install everything:
 
 ```bash
 pi install git:github.com/butttons/pi-kit
 ```
 
-Cherry-pick specific resources by editing `~/.pi/agent/settings.json` (or `.pi/settings.json` for project-level):
+Cherry-pick resources via the `packages` array in `~/.pi/agent/settings.json` (or `.pi/settings.json` for project-level); after install, `pi config` toggles individual resources from the TUI.
 
-```json
-{
-  "packages": [
-    {
-      "source": "git:github.com/butttons/pi-kit",
-      "extensions": [
-        "extensions/safe-delete.ts",
-        "extensions/context-usage.ts",
-        "extensions/plan-mode"
-      ],
-      "skills": ["skills/commit-helper", "skills/pr-helper"],
-      "themes": []
-    }
-  ]
-}
+## What's inside
+
+No inventory tables here — they drift. Look at the filesystem; every extension and skill documents itself in its own file:
+
+```bash
+ls extensions/ skills/ themes/
+head -20 extensions/safe-delete.ts     # each file explains itself at the top
+head -5 skills/pi-costs/SKILL.md       # name + description from frontmatter
 ```
-
-- Omit a key to load all of that type.
-- Use `[]` to load none of that type.
-- Use `!pattern` to exclude specific items.
-
-After install, run `pi config` to enable/disable individual resources from the TUI.
-
-## Extensions
-
-### Safety and Guardrails
-
-| Extension         | Description                                                                                                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **safe-delete**   | Intercepts destructive bash commands: `rm` on protected/large paths, `find -delete`, recursive `chmod`/`chown`, `git clean -fdx`, `dd` to devices, wildcard explosions, and more. |
-| **safe-commit**   | Prompts for confirmation before git commits.                                                                                                                                      |
-
-### Workflow
-
-| Extension              | Description                                                                                                                                           |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **plan-mode**          | `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle. Uses `dora` if available                       |
-| **handoff**            | `/handoff` command to transfer context to a new focused session.                                                                                      |
-| **thinking-stash**     | Captures thinking tokens during streaming. `/rethink` re-injects them into the next turn after an interruption.                                       |
-| **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                                                                        |
-| **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.                                               |
-| **lazy-agents**        | Loads AGENTS.md files on demand as the agent touches directories within the project. Avoids context bloat from loading all project rules upfront.        |
-
-### UI
-
-| Extension         | Description                                                                                              |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| **context-usage** | Custom footer with model, tokens, cost, context bar, and git branch.                                     |
-
-### Integrations
-
-| Extension      | Description                                                                                                                                                             |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **dora**       | Lifecycle hooks for [dora](https://github.com/butttons/dora) code intelligence CLI.                                                                                     |
-| **executor-provider** | Fabric provider that bridges the local [Executor](https://github.com/flowglad/executor) daemon (`http://localhost:4789`) into pi as `executor.search` / `executor.describe` / `executor.call` tools. Reads the daemon connection from `~/.executor`. |
-| **exa-search** | Web search via [Exa AI](https://exa.ai). Set `EXA_API_KEY`, then use `exa_search` tool for real-time web search with highlights.                                        |
-| **opencode-usage** | `/usage` command that queries the opencode go usage endpoint (rolling/weekly/monthly). Uses the `opencode-go` provider key from pi auth.                              |
-| **command-code** | Registers the [Command Code](https://commandcode.ai/provider) provider API: live-fetches the model list and exposes it as `command-code` (OpenAI-compatible) and `command-code-anthropic` (Claude models). Uses the `command-code` key from pi auth. |
-
-## Skills
-
-### Git and Releases
-
-| Skill                | Description                                                 |
-| -------------------- | ----------------------------------------------------------- |
-| **commit-helper**    | Generates conventional commit messages from staged changes. |
-| **pr-helper**        | Creates GitHub pull requests via `gh` CLI.                  |
-| **release-helper**   | Automates git tags and GitHub releases.                     |
-| **changeset-helper** | Manage changelogs and versioning with the changesets CLI.   |
-| **git-fix**          | Diagnoses and fixes diverged git branches.                  |
-
-### Infrastructure
-
-| Skill              | Description                                                                                            |
-| ------------------ | ------------------------------------------------------------------------------------------------------ |
-| **wrangler-ops**   | Operational patterns for Wrangler CLI: deploy, D1 migrations, queries, R2 management, type generation. |
-
-### Knowledge
-
-| Skill   | Description                                                                                                                                                                                                                                   |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **obi** | Query Obsidian vaults via the [obi](https://github.com/butttons/obi) CLI. Use for any vault data lookup instead of grep or find -- searching, filtering by frontmatter, reading sections, checking backlinks, finding unread or recent notes. |
-
-### Tools
-
-| Skill              | Description                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| **beans**          | Manage tasks, bugs, and features with the [beans](https://github.com/hmans/beans) issue tracker. |
-| **playwright-cli** | Browser automation command reference for playwright-cli.                                         |
-| **pi-costs**       | Analyze pi session costs, token usage, and statistics.                                           |
-| **tanstack-start** | Build full-stack React apps with TanStack Start: routing, server functions, middleware, deployment. |
-| **herdr-pi-subagents** | Plain subagent orchestration in herdr via pi-herdr-agents: fabric_exec call shapes, parallel fan-out, pinned model tiers, and the survey-then-fan-out workflow loop. |
-
-## Themes
-
-| Theme        | Description                                                               |
-| ------------ | ------------------------------------------------------------------------- |
-| **butttons** | [Catppuccin](https://github.com/catppuccin/catppuccin) Mocha-based theme. |
