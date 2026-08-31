@@ -1,5 +1,11 @@
 # AGENTS.md
 
+Current package version:
+
+```auto:bash
+git describe --tags --abbrev=0 2>/dev/null || jq -r '.version' package.json
+```
+
 This is a pi package (`pi install git:github.com/butttons/pi-kit`). It contains extensions, skills, and themes.
 
 Read `README.md` and `package.json` before making changes. Follow the conventions already present in existing extensions and skills.

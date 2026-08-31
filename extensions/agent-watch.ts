@@ -8,8 +8,9 @@
  * on consecutive scans with an unchanged sequence — so the orchestrator
  * can tell at a glance which agents are progressing and which are stuck.
  *
- * Scans run every 5 minutes on an unref'd interval, torn down on session
- * shutdown. Every filesystem failure degrades silently: a failed scan is
+ * Scans run every AGENT_WATCH_INTERVAL_MINUTES (default 10) on an unref'd
+ * interval, torn down on session shutdown. All-green scans stay silent
+ * unless AGENT_WATCH_HEARTBEAT=1. Every filesystem failure degrades silently: a failed scan is
  * skipped and never throws.
  */
 
@@ -18,8 +19,19 @@ import { readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
-const SCAN_INTERVAL_MS = 5 * 60 * 1000;
+/**
+ * Scan cadence: AGENT_WATCH_INTERVAL_MINUTES (default 10). The heartbeat is
+ * also suppressed for healthy agents — see AGENT_WATCH_HEARTBEAT below.
+ */
+const SCAN_INTERVAL_MS =
+	Number(process.env.AGENT_WATCH_INTERVAL_MINUTES ?? 10) * 60 * 1000;
 const ACTIVE_WINDOW_MS = 60 * 60 * 1000;
+/**
+ * When false (default), only ping when at least one agent has stall >= 1 —
+ * an all-green scan stays silent. Set AGENT_WATCH_HEARTBEAT=1 to get a
+ * status line every scan regardless.
+ */
+const HEARTBEAT = process.env.AGENT_WATCH_HEARTBEAT === "1";
 const SESSIONS_BASE = join(homedir(), ".pi", "agent", "sessions");
 
 interface SubagentActivity {
@@ -115,7 +127,8 @@ export default function agentWatch(pi: ExtensionAPI) {
 				}
 			}
 
-			if (lines.length > 0) {
+			const anyStalled = [...agents.values()].some((a) => a.stallCount >= 1);
+			if (lines.length > 0 && (HEARTBEAT || anyStalled)) {
 				pi.sendUserMessage(lines.join(" "), { deliverAs: "followUp" });
 			}
 		} catch {
