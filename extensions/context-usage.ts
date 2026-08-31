@@ -7,9 +7,55 @@
 
 import { execSync } from "node:child_process";
 import { basename } from "node:path";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+	calculateContextTokens,
+	estimateTokens,
+} from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+
+const FOLD_MARKER_TYPE = "fold-marker";
+
+/** Index of the latest fold-marker entry on the branch, or -1 if none. */
+function findFoldCutoff(
+	branch: Array<{ type: string; customType?: string }>,
+): number {
+	for (let i = branch.length - 1; i >= 0; i--) {
+		const entry = branch[i];
+		if (
+			entry.type === "custom_message" &&
+			entry.customType === FOLD_MARKER_TYPE
+		) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/**
+ * Estimate context tokens the way pi core does (real usage from the last
+ * valid assistant response, otherwise a per-message estimate), but over the
+ * post-fold messages only. pi core's getContextUsage() sees the unfiltered
+ * message list, so it can't account for /fold's context filter.
+ */
+function postFoldContextTokens(messages: AgentMessage[]): number {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i] as AssistantMessage;
+		if (msg.role !== "assistant") continue;
+		if (
+			msg.stopReason === "aborted" ||
+			msg.stopReason === "error" ||
+			!msg.usage ||
+			calculateContextTokens(msg.usage) <= 0
+		) {
+			break; // last assistant is invalid — fall through to estimate
+		}
+		return calculateContextTokens(msg.usage);
+	}
+	return messages.reduce((sum, m) => sum + estimateTokens(m), 0);
+}
 
 type Theme = {
 	fg: (color: string, text: string) => string;
@@ -54,21 +100,59 @@ export default function (pi: ExtensionAPI) {
 						n < 1000 ? `${n}` : `${(n / 1000).toFixed(1)}k`;
 
 					// Token stats
+					// ↑ input: tokens sent to the LLM on the last turn (post-fold
+					// context), with the % served from the provider cache
+					// ↓ output: cumulative tokens generated this session
 					let input = 0;
+					let cachedPct: number | null = null;
 					let output = 0;
 					let cost = 0;
-					for (const e of ctx.sessionManager.getBranch()) {
+					const branchEntries = ctx.sessionManager.getBranch();
+					const cutoff = findFoldCutoff(branchEntries);
+					for (const e of branchEntries) {
 						if (e.type === "message" && e.message.role === "assistant") {
 							const m = e.message as AssistantMessage;
-							input += m.usage.input;
 							output += m.usage.output;
 							cost += m.usage.cost.total;
 						}
 					}
+					for (let i = branchEntries.length - 1; i > cutoff; i--) {
+						const e = branchEntries[i];
+						if (e.type !== "message" || e.message.role !== "assistant")
+							continue;
+						const m = e.message as AssistantMessage;
+						if (
+							m.stopReason === "aborted" ||
+							m.stopReason === "error" ||
+							!m.usage ||
+							m.usage.input + m.usage.output <= 0
+						) {
+							break;
+						}
+						const u = m.usage;
+						input = u.input + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+						const totalIn = input;
+						cachedPct =
+							totalIn > 0
+								? Math.round(((u.cacheRead ?? 0) / totalIn) * 100)
+								: null;
+						break;
+					}
 
-					// Context usage bar
-					const usage = ctx.getContextUsage();
-					const pct = usage ? Math.round(usage.percent) : 0;
+					// Context usage bar — computed over post-fold messages so the
+					// bar drops after /fold (pi core's getContextUsage() ignores
+					// extension context filters)
+					let pct = 0;
+					if (ctx.model && ctx.model.contextWindow > 0) {
+						const branch = ctx.sessionManager.getBranch();
+						const cutoff = findFoldCutoff(branch);
+						const postFoldMessages = branch
+							.slice(cutoff + 1)
+							.filter((e: { type: string }) => e.type === "message")
+							.map((e: { message: AgentMessage }) => e.message);
+						const tokens = postFoldContextTokens(postFoldMessages);
+						pct = Math.round((tokens / ctx.model.contextWindow) * 100);
+					}
 					const barWidth = 10;
 					const filled = Math.round((pct / 100) * barWidth);
 					const empty = barWidth - filled;
@@ -81,7 +165,12 @@ export default function (pi: ExtensionAPI) {
 
 					// Sections
 					const modelStr = theme.fg("accent", ctx.model?.id ?? "no model");
-					const statsStr = theme.fg("muted", `${fmt(input)}/${fmt(output)}`);
+					const statsStr =
+						theme.fg("muted", `↑${fmt(input)}`) +
+						(cachedPct !== null
+							? theme.fg("dim", ` ${cachedPct}%`)
+							: "") +
+						theme.fg("muted", ` ↓${fmt(output)}`);
 					const costStr = theme.fg("dim", `$${cost.toFixed(2)}`);
 					const contextStr = `${bar} ${barLabel}`;
 
