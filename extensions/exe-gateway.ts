@@ -70,6 +70,13 @@ function withDefaults(id: string): RegistryModel {
 	return { id, name: id, reasoning: true, input: ["text"], cost: { input: 0, output: 0 }, contextWindow: 131072, maxTokens: 8192 };
 }
 
+// Display names carry the lane tag so opencode-go vs command-code is
+// unambiguous in pickers (IDs must stay clean for profile portability).
+function tagName(model: RegistryModel, tag: string): RegistryModel {
+	const base = model.name && model.name !== model.id ? model.name : model.id;
+	return { ...model, name: `${base} [${tag}]` };
+}
+
 function retarget(model: RegistryModel, baseUrl: string): RegistryModel {
 	const { baseUrl: _drop, ...rest } = model;
 	return { ...rest, baseUrl };
@@ -98,7 +105,7 @@ export default async function (pi: ExtensionAPI) {
 		baseUrl: `${BASE}/opencode-go/v1`,
 		apiKey: KEYLESS,
 		api: "openai-completions",
-		models: ocgIds.map((id) => retarget(ocgRegistry[id] ?? withDefaults(id), `${BASE}/opencode-go/v1`)),
+		models: ocgIds.map((id) => tagName(retarget(ocgRegistry[id] ?? withDefaults(id), `${BASE}/opencode-go/v1`), "oc-go")),
 	});
 
 	pi.registerProvider("command-code", {
@@ -106,7 +113,7 @@ export default async function (pi: ExtensionAPI) {
 		baseUrl: `${BASE}/command-code/v1`,
 		apiKey: KEYLESS,
 		api: "openai-completions",
-		models: COMMAND_CODE_MODELS.map((m) => retarget(m, `${BASE}/command-code/v1`)),
+		models: COMMAND_CODE_MODELS.map((m) => tagName(retarget(m, `${BASE}/command-code/v1`), "cmd")),
 	});
 
 	const kimiModels = KIMI_IDS.map((id) => kimiRegistry[id] ?? withDefaults(id));
@@ -115,6 +122,6 @@ export default async function (pi: ExtensionAPI) {
 		baseUrl: `${BASE}/kimi-code`,
 		apiKey: KEYLESS,
 		api: "anthropic-messages",
-		models: kimiModels.map((m) => retarget(m, `${BASE}/kimi-code`)),
+		models: kimiModels.map((m) => tagName(retarget(m, `${BASE}/kimi-code`), "kimi")),
 	});
 }
