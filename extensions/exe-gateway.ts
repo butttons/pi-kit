@@ -113,15 +113,19 @@ function stripPrefix(id: string): string {
 	return id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
 }
 
-// Capability lookup candidates: exact id, prefix-stripped, then the base
-// model family (e.g. "glm-5.3-flash" -> "glm-5.3", "glm-5.2-fast" ->
-// "glm-5.2-highspeed"). Variant suffixes served by command-code often
-// aren't in pi's registry but share the base model's capabilities.
+// Capability lookup candidates: exact id, prefix-stripped, then each
+// dash-truncated base family (e.g. "glm-5.3-flash" -> "glm-5.3",
+// "deepseek-v4-flash-fast" -> "deepseek-v4-flash"). Variant suffixes served
+// by these providers often aren't in pi's registry, but share the base
+// model's capabilities — same weights across providers, only the lane differs.
 function resolveCandidates(id: string): string[] {
 	const bare = stripPrefix(id);
 	const candidates = [id, bare];
-	const base = bare.match(/^(glm-[\d.]+)-/);
-	if (base) candidates.push(base[1], base[1] + "-highspeed");
+	const parts = bare.split("-");
+	while (parts.length > 1) {
+		parts.pop();
+		candidates.push(parts.join("-"));
+	}
 	return candidates;
 }
 
@@ -227,13 +231,24 @@ const KIMI_IDS = ["kimi-for-coding", "k3", "k3-256k"]; // verified via /kimi-cod
 // =========================================================================
 
 export default async function (pi: ExtensionAPI) {
-	const [ocgRegistry, zaiRegistry, anthropicRegistry, kimiRegistry, liveIds] = await Promise.all([
-		loadRegistry("opencode-go", "openai-completions"),
-		loadRegistry("zai", "openai-completions"),
-		loadRegistry("anthropic", "anthropic-messages"),
-		loadRegistry("kimi-coding", "anthropic-messages"),
+	// Registries consulted for capability metadata. Models are provider-agnostic
+	// (same weights on every lane), so native registries are valid references.
+	const [registries, liveIds] = await Promise.all([
+		Promise.all([
+			loadRegistry("opencode-go", "openai-completions"),
+			loadRegistry("zai", "openai-completions"),
+			loadRegistry("anthropic", "anthropic-messages"),
+			loadRegistry("kimi-coding", "anthropic-messages"),
+			loadRegistry("google", "google-generative-ai"),
+			loadRegistry("xai", "openai-responses"),
+			loadRegistry("moonshotai", "openai-completions"),
+			loadRegistry("nvidia", "openai-completions"),
+			loadRegistry("minimax", "anthropic-messages"),
+		]).then((rs) => rs.flat()),
 		fetchOpencodeGoIds(),
 	]);
+
+	const ocgRegistry = registries[0];
 
 	const ocgIds = liveIds ?? Object.keys(ocgRegistry);
 	pi.registerProvider("opencode-go", {
@@ -250,7 +265,7 @@ export default async function (pi: ExtensionAPI) {
 		apiKey: KEYLESS,
 		api: "openai-completions",
 		models: COMMAND_CODE_IDS.map((id) =>
-			tagName(toConfig(retarget(resolveModel(id, ocgRegistry, zaiRegistry), `${BASE}/command-code/v1`)), "cmd"),
+			tagName(toConfig(retarget(resolveModel(id, ...registries), `${BASE}/command-code/v1`)), "cmd"),
 		),
 	});
 
@@ -260,7 +275,7 @@ export default async function (pi: ExtensionAPI) {
 		apiKey: KEYLESS,
 		api: "anthropic-messages",
 		models: COMMAND_CODE_ANTHROPIC_IDS.map((id) =>
-			tagName(toConfig(retarget(resolveModel(id, anthropicRegistry), `${BASE}/command-code`)), "cmd-claude"),
+			tagName(toConfig(retarget(resolveModel(id, ...registries), `${BASE}/command-code`)), "cmd-claude"),
 		),
 	});
 
@@ -269,6 +284,6 @@ export default async function (pi: ExtensionAPI) {
 		baseUrl: `${BASE}/kimi-code`,
 		apiKey: KEYLESS,
 		api: "anthropic-messages",
-		models: KIMI_IDS.map((id) => tagName(toConfig(retarget(kimiRegistry[id] ?? withDefaults(id), `${BASE}/kimi-code`)), "kimi")),
+		models: KIMI_IDS.map((id) => tagName(toConfig(retarget(registries[3][id] ?? resolveModel(id, ...registries), `${BASE}/kimi-code`)), "kimi")),
 	});
 }

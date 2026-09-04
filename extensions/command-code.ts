@@ -67,16 +67,19 @@ function stripPrefix(id: string): string {
 	return id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
 }
 
-// Capability reference lookup: exact id, then prefix-stripped, then the base
-// model family (e.g. "glm-5.3-flash" -> "glm-5.3", "glm-5.2-flash" ->
-// "glm-5.2-highspeed") per registry. Variant suffixes served by command-code
-// often aren't in pi's registry, but share the base model's capabilities.
+// Capability reference lookup: exact id, prefix-stripped, then each
+// dash-truncated base family (e.g. "glm-5.3-flash" -> "glm-5.3",
+// "deepseek-v4-flash-fast" -> "deepseek-v4-flash") per registry. Variant
+// suffixes served by command-code often aren't in pi's registry, but share
+// the base model's capabilities — same weights across providers, only the
+// lane differs.
 function resolveCandidates(id: string): string[] {
 	const bare = stripPrefix(id);
 	const candidates = [id, bare];
-	const base = bare.match(/^(glm-[\d.]+)-/);
-	if (base) {
-		candidates.push(base[1], base[1] + "-highspeed");
+	const parts = bare.split("-");
+	while (parts.length > 1) {
+		parts.pop();
+		candidates.push(parts.join("-"));
 	}
 	return candidates;
 }
@@ -104,11 +107,21 @@ async function readApiKey(): Promise<string | null> {
 }
 
 export default async function (pi: ExtensionAPI) {
-	const [apiKey, ocgRegistry, zaiRegistry, anthropicRegistry] = await Promise.all([
+	// Registries consulted for capability metadata. Models are provider-agnostic
+	// (same weights on command-code as on their native provider), so every
+	// native registry is a valid reference, not just zai/opencode-go.
+	const [apiKey, registries] = await Promise.all([
 		readApiKey(),
-		loadRegistry("opencode-go", "openai-completions"),
-		loadRegistry("zai", "openai-completions"),
-		loadRegistry("anthropic", "anthropic-messages"),
+		Promise.all([
+			loadRegistry("opencode-go", "openai-completions"),
+			loadRegistry("zai", "openai-completions"),
+			loadRegistry("anthropic", "anthropic-messages"),
+			loadRegistry("google", "google-generative-ai"),
+			loadRegistry("xai", "openai-responses"),
+			loadRegistry("moonshotai", "openai-completions"),
+			loadRegistry("nvidia", "openai-completions"),
+			loadRegistry("minimax", "anthropic-messages"),
+		]).then((rs) => rs.flat()),
 	]);
 	if (!apiKey) {
 		console.error(PROVIDER + ': no API key in pi auth, provider not registered. Add it via /login or auth.json under "' + PROVIDER + '".');
@@ -133,11 +146,13 @@ export default async function (pi: ExtensionAPI) {
 	const isClaude = (model: ProviderModel) => model.id.startsWith("claude");
 
 	const toModelConfig = (model: ProviderModel) => {
-		const caps = resolveCapabilities(model.id, isClaude(model) ? anthropicRegistry : ocgRegistry, zaiRegistry);
+		const caps = resolveCapabilities(model.id, ...registries);
 		return {
 			id: model.id,
 			name: model.name ?? model.id,
-			reasoning: caps.reasoning ?? false,
+			// Catalog models are reasoning-capable; default true so unknown
+		// variants still get thinking controls.
+		reasoning: caps.reasoning ?? true,
 			input: (caps.input ?? ["text"]) as ("text" | "image")[],
 			compat: caps.compat,
 			thinkingLevelMap: caps.thinkingLevelMap,
