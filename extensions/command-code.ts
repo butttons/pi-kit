@@ -67,9 +67,22 @@ function stripPrefix(id: string): string {
 	return id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
 }
 
-// Capability reference lookup: exact id, then prefix-stripped, per registry.
+// Capability reference lookup: exact id, then prefix-stripped, then the base
+// model family (e.g. "glm-5.3-flash" -> "glm-5.3", "glm-5.2-flash" ->
+// "glm-5.2-highspeed") per registry. Variant suffixes served by command-code
+// often aren't in pi's registry, but share the base model's capabilities.
+function resolveCandidates(id: string): string[] {
+	const bare = stripPrefix(id);
+	const candidates = [id, bare];
+	const base = bare.match(/^(glm-[\d.]+)-/);
+	if (base) {
+		candidates.push(base[1], base[1] + "-highspeed");
+	}
+	return candidates;
+}
+
 function resolveCapabilities(id: string, ...registries: Record<string, RegistryModel>[]): Pick<ProviderModel, "reasoning" | "input" | "compat" | "thinkingLevelMap"> { // prettier-ignore
-	const candidates = [id, stripPrefix(id)];
+	const candidates = resolveCandidates(id);
 	for (const reg of registries) {
 		for (const cand of candidates) {
 			const hit = reg[cand];
