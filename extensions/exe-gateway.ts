@@ -80,6 +80,80 @@ async function fetchOpencodeGoIds(): Promise<string[] | null> {
 	);
 }
 
+// Context-window overrides from the live command-code model API
+// (api.commandcode.ai/provider/v1/models, 2026-09-04) for models with no
+// registry metadata. Keyed by lowercase bare id; also corrects stale
+// registry values since the same weights share context parity across lanes.
+const CONTEXT_OVERRIDES: Record<string, number> = {
+	"minimax-m2.5": 200000,
+	"minimax-m2.7": 200000,
+	"minimax-m3": 1000000,
+	"qwen3.6-max-preview": 200000,
+	"qwen3.6-plus": 200000,
+	"qwen3.7-flash": 1000000,
+	"qwen3.7-max": 1000000,
+	"qwen3.7-plus": 1000000,
+	"qwen3.8-27b": 262144,
+	"qwen3.8-flash": 1000000,
+	"qwen3.8-max": 1000000,
+	"qwen3.8-max-0902": 1000000,
+	"claude-fable-5": 1000000,
+	"claude-fable-5-1": 1000000,
+	"claude-haiku-4-5": 200000,
+	"claude-opus-4-7": 1000000,
+	"claude-opus-4-8": 1000000,
+	"claude-opus-5": 1000000,
+	"claude-sonnet-4-6": 1000000,
+	"claude-sonnet-5": 1000000,
+	"deepseek-v4-flash": 1000000,
+	"deepseek-v4-flash-fast": 1000000,
+	"deepseek-v4-flash-vision-exp": 1000000,
+	"deepseek-v4-pro": 1000000,
+	"gemini-3.1-flash-lite": 1000000,
+	"gemini-3.5-flash": 1000000,
+	"gemini-3.5-flash-lite": 1000000,
+	"gemini-3.6-flash": 1000000,
+	"gemini-3.7-flash": 1048576,
+	"gemini-3.8-flash": 1000000,
+	"gpt-5.3-codex": 400000,
+	"gpt-5.4": 400000,
+	"gpt-5.4-mini": 400000,
+	"gpt-5.5": 400000,
+	"gpt-5.6-luna": 1050000,
+	"gpt-5.6-sol": 1050000,
+	"gpt-5.6-terra": 1050000,
+	"longcat-2.0:free": 1048576,
+	"muse-spark-1.1": 1048576,
+	"muse-spark-1.2": 1048576,
+	"muse-spark-1.2-contributor": 1048576,
+	"muse-spark-1.3": 1048576,
+	"muse-spark-1.3-contributor": 1048576,
+	"kimi-k2.5": 256000,
+	"kimi-k2.6": 256000,
+	"kimi-k2.7-code": 256000,
+	"kimi-k2.7-code-highspeed": 262000,
+	"kimi-k3": 1000000,
+	"nemotron-3-ultra-550b-a55b": 1000000,
+	"laguna-s-2.1-free": 256000,
+	"fugu-ultra": 1000000,
+	"step-3.5-flash": 1000000,
+	"step-3.7-flash": 256000,
+	"hy3-paid": 262144,
+	"hy4-preview": 1048576,
+	"inkling": 256000,
+	"inkling-small": 1000000,
+	"grok-4.5": 500000,
+	"grok-4.6": 500000,
+	"mimo-v2.5": 1000000,
+	"mimo-v2.5-pro": 1000000,
+	"glm-5.3-flash": 1048576,
+	"glm-5": 200000,
+	"glm-5.1": 200000,
+	"glm-5.2": 1000000,
+	"glm-5.2-fast": 1000000,
+	"glm-5.3": 1000000,
+};
+
 function withDefaults(id: string): RegistryModel {
 	return { id, name: id, reasoning: true, input: ["text"], cost: { input: 0, output: 0 }, contextWindow: 131072, maxTokens: 8192 };
 }
@@ -97,14 +171,17 @@ function retarget(model: RegistryModel, baseUrl: string): RegistryModel {
 }
 
 // Fill fields ProviderModelConfig requires but registry entries may omit.
+// CONTEXT_OVERRIDES wins over registry values: context parity holds across
+// lanes even when pi's bundled registry is stale.
 function toConfig(m: RegistryModel): ProviderModelConfig {
+	const bareId = m.id.toLowerCase();
 	return {
 		...m,
 		name: m.name ?? m.id,
 		reasoning: m.reasoning ?? true,
 		input: m.input ?? ["text"],
 		cost: { input: m.cost?.input ?? 0, output: m.cost?.output ?? 0, cacheRead: m.cost?.cacheRead ?? 0, cacheWrite: m.cost?.cacheWrite ?? 0 },
-		contextWindow: m.contextWindow ?? 131072,
+		contextWindow: CONTEXT_OVERRIDES[bareId] ?? m.contextWindow ?? 131072,
 		maxTokens: m.maxTokens ?? 8192,
 	};
 }
