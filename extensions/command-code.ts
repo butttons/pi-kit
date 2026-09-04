@@ -157,7 +157,7 @@ export default async function (pi: ExtensionAPI) {
 			compat: caps.compat,
 			thinkingLevelMap: caps.thinkingLevelMap,
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: model.context_length ?? 128000,
+			contextWindow: model.context_length ?? 1000000,
 			maxTokens: 16384,
 		};
 	};

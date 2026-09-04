@@ -155,7 +155,7 @@ const CONTEXT_OVERRIDES: Record<string, number> = {
 };
 
 function withDefaults(id: string): RegistryModel {
-	return { id, name: id, reasoning: true, input: ["text"], cost: { input: 0, output: 0 }, contextWindow: 131072, maxTokens: 8192 };
+	return { id, name: id, reasoning: true, input: ["text"], cost: { input: 0, output: 0 },  contextWindow: 1000000, maxTokens: 8192 };
 }
 
 // Display names carry the lane tag so opencode-go vs command-code is
@@ -181,7 +181,7 @@ function toConfig(m: RegistryModel): ProviderModelConfig {
 		reasoning: m.reasoning ?? true,
 		input: m.input ?? ["text"],
 		cost: { input: m.cost?.input ?? 0, output: m.cost?.output ?? 0, cacheRead: m.cost?.cacheRead ?? 0, cacheWrite: m.cost?.cacheWrite ?? 0 },
-		contextWindow: CONTEXT_OVERRIDES[bareId] ?? m.contextWindow ?? 131072,
+		contextWindow: CONTEXT_OVERRIDES[bareId] ?? m.contextWindow ?? 1000000,
 		maxTokens: m.maxTokens ?? 8192,
 	};
 }
