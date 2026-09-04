@@ -60,15 +60,24 @@ async function loadRegistry(provider: string, section: string): Promise<Record<s
 	return {};
 }
 
-async function fetchOpencodeGoIds(): Promise<string[] | null> {
+// The gateway's /v1/models returns an empty list (known upstream quirk),
+// so fall back to opencode-go's public upstream catalog.
+async function fetchIds(url: string, stripPrefixRe: RegExp): Promise<string[] | null> {
 	try {
-		const res = await fetch(`${BASE}/opencode-go/v1/models`);
+		const res = await fetch(url);
 		const data = (await res.json()) as { data?: { id: string }[] };
-		const ids = (data.data ?? []).map((m) => m.id.replace(/^opencode-go\//, ""));
+		const ids = (data.data ?? []).map((m) => m.id.replace(stripPrefixRe, ""));
 		return ids.length > 0 ? ids : null;
 	} catch {
 		return null;
 	}
+}
+
+async function fetchOpencodeGoIds(): Promise<string[] | null> {
+	return (
+		(await fetchIds(`${BASE}/opencode-go/v1/models`, /^opencode-go\//)) ??
+		(await fetchIds("https://opencode.ai/zen/go/v1/models", /^opencode-go\//))
+	);
 }
 
 function withDefaults(id: string): RegistryModel {
@@ -104,10 +113,22 @@ function stripPrefix(id: string): string {
 	return id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
 }
 
-// Resolve capability metadata: try exact id, then prefix-stripped, across
-// registries in order. First hit wins.
+// Capability lookup candidates: exact id, prefix-stripped, then the base
+// model family (e.g. "glm-5.3-flash" -> "glm-5.3", "glm-5.2-fast" ->
+// "glm-5.2-highspeed"). Variant suffixes served by command-code often
+// aren't in pi's registry but share the base model's capabilities.
+function resolveCandidates(id: string): string[] {
+	const bare = stripPrefix(id);
+	const candidates = [id, bare];
+	const base = bare.match(/^(glm-[\d.]+)-/);
+	if (base) candidates.push(base[1], base[1] + "-highspeed");
+	return candidates;
+}
+
+// Resolve capability metadata: try each candidate across registries in
+// order. First hit wins.
 function resolveModel(id: string, ...registries: Record<string, RegistryModel>[]): RegistryModel {
-	const candidates = [id, stripPrefix(id)];
+	const candidates = resolveCandidates(id);
 	for (const reg of registries) {
 		for (const cand of candidates) {
 			if (reg[cand]) return { ...reg[cand], id };
@@ -118,14 +139,89 @@ function resolveModel(id: string, ...registries: Record<string, RegistryModel>[]
 
 // === Easy-to-edit model lists ============================================
 // command-code OpenAI-shape (POST /command-code/v1/chat/completions).
-// Verified working on the gateway 2026-09-03. Add an id from
-// `cmd --list-models` and metadata resolves automatically.
-const COMMAND_CODE_IDS = ["z-ai/glm-5.3-flash", "deepseek/deepseek-v4-flash", "xiaomi/mimo-v2.5"];
+// Full `cmd --list-models` catalog minus Claude (2026-09-04, cmd 1.47.0).
+// Add an id from `cmd --list-models` and metadata resolves automatically.
+const COMMAND_CODE_IDS = [
+	// Open Source
+	"deepseek/deepseek-v4-pro",
+	"deepseek/deepseek-v4-flash",
+	"deepseek/deepseek-v4-flash-vision-exp",
+	"deepseek/deepseek-v4-flash-fast",
+	"moonshotai/kimi-k3",
+	"moonshotai/kimi-k2.7-code",
+	"moonshotai/kimi-k2.7-code-highspeed",
+	"moonshotai/kimi-k2.6",
+	"moonshotai/kimi-k2.5",
+	"z-ai/glm-5.3-flash",
+	"zai-org/glm-5.3",
+	"zai-org/glm-5.2",
+	"zai-org/glm-5.2-fast",
+	"zai-org/glm-5.1",
+	"zai-org/glm-5",
+	"minimaxai/minimax-m3",
+	"minimaxai/minimax-m2.7",
+	"minimaxai/minimax-m2.5",
+	"xiaomi/mimo-v2.5-pro",
+	"xiaomi/mimo-v2.5",
+	"qwen/qwen3.8-max-0902",
+	"qwen/qwen3.8-max",
+	"qwen/qwen3.8-27b",
+	"qwen/qwen3.8-flash",
+	"qwen/qwen3.7-max",
+	"qwen/qwen3.7-plus",
+	"qwen/qwen3.7-flash",
+	"qwen/qwen3.6-max-preview",
+	"qwen/qwen3.6-plus",
+	"meituan/longcat-2.0:free",
+	"stepfun/step-3.7-flash",
+	"stepfun/step-3.5-flash",
+	"tencent/hy3-paid",
+	"tencent/hy4-preview",
+	"nvidia/nemotron-3-ultra-550b-a55b",
+	"thinkingmachines/inkling",
+	"thinkingmachines/inkling-small",
+	"poolside/laguna-s-2.1-free",
+	// OpenAI
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna",
+	"gpt-5.5",
+	"gpt-5.4",
+	"gpt-5.3-codex",
+	"gpt-5.4-mini",
+	// Google
+	"google/gemini-3.8-flash",
+	"google/gemini-3.7-flash",
+	"google/gemini-3.6-flash",
+	"google/gemini-3.5-flash",
+	"google/gemini-3.5-flash-lite",
+	"google/gemini-3.1-flash-lite",
+	// Sakana
+	"sakana/fugu-ultra",
+	// Meta
+	"meta/muse-spark-1.1",
+	"meta/muse-spark-1.2",
+	"meta/muse-spark-1.2-contributor",
+	"meta/muse-spark-1.3",
+	"meta/muse-spark-1.3-contributor",
+	// xAI
+	"xai/grok-4.5",
+	"xai/grok-4.6",
+];
 
 // command-code Anthropic-shape (POST /command-code/v1/messages, needs
 // anthropic-version header). IDs from `cmd --list-models` Anthropic section.
 // NOTE: plan-gated upstream until the exe command-code plan includes Claude.
-const COMMAND_CODE_ANTHROPIC_IDS = ["claude-sonnet-5", "claude-haiku-4-5"];
+const COMMAND_CODE_ANTHROPIC_IDS = [
+	"claude-sonnet-5",
+	"claude-sonnet-4-6",
+	"claude-fable-5-1",
+	"claude-fable-5",
+	"claude-opus-5",
+	"claude-opus-4-8",
+	"claude-opus-4-7",
+	"claude-haiku-4-5",
+];
 
 const KIMI_IDS = ["kimi-for-coding", "k3", "k3-256k"]; // verified via /kimi-code/v1/messages
 // =========================================================================
