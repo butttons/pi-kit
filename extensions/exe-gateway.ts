@@ -26,6 +26,13 @@ const DEFAULT_BASE = "https://llm.int.exe.xyz";
 //   REEF_TOKEN=reef-local                      — reef service credential (default: keyless)
 //   REEF_SCENARIO=pi-daily                     — required x-reef-scenario header when behind reef
 const BASE = process.env.EXE_GATEWAY_BASE ?? DEFAULT_BASE;
+// Reef mode: reef serves only /v1/* and forwards the body's `model`
+// verbatim to the gateway's generic /v1 endpoint (which routes by model
+// ID, lane-prefixed IDs like "command-code/..." included). So behind reef
+// the lane path prefixes (/command-code, /opencode-go, /kimi-code) must be
+// dropped, or every call 404s. Flag on REEF_SCENARIO: reef rejects
+// inference without the x-reef-scenario header anyway, so the header's
+// presence is the reliable "behind reef" signal.
 const API_KEY = process.env.REEF_TOKEN ?? "exe-keyless"; // gateway injects auth; pi just needs a non-empty key
 const EXTRA_HEADERS: Record<string, string> = process.env.REEF_SCENARIO
 	? { "x-reef-scenario": process.env.REEF_SCENARIO }
@@ -81,9 +88,15 @@ async function fetchIds(url: string, stripPrefixRe: RegExp): Promise<string[] | 
 	}
 }
 
+const REEF_MODE = (process.env.REEF_SCENARIO ?? "") !== "";
+// OpenAI-shape lanes: {base}/chat/completions appended by pi.
+const openaiBase = (lane: string) => (REEF_MODE ? `${BASE}/v1` : `${BASE}/${lane}/v1`);
+// Anthropic-shape lanes: {base}/v1/messages appended by pi.
+const anthropicBase = (lane: string) => (REEF_MODE ? BASE : `${BASE}/${lane}`);
+
 async function fetchOpencodeGoIds(): Promise<string[] | null> {
 	return (
-		(await fetchIds(`${BASE}/opencode-go/v1/models`, /^opencode-go\//)) ??
+		(await fetchIds(`${openaiBase("opencode-go")}/models`, /^opencode-go\//)) ??
 		(await fetchIds("https://opencode.ai/zen/go/v1/models", /^opencode-go\//))
 	);
 }
@@ -338,41 +351,41 @@ export default async function (pi: ExtensionAPI) {
 	const ocgIds = liveIds ?? Object.keys(ocgRegistry);
 	pi.registerProvider("opencode-go", {
 		name: "exe opencode-go",
-		baseUrl: `${BASE}/opencode-go/v1`,
+		baseUrl: openaiBase("opencode-go"),
 		apiKey: API_KEY,
 		headers: EXTRA_HEADERS,
 		api: "openai-completions",
-		models: ocgIds.map((id) => tagName(toConfig(retarget(ocgRegistry[id] ?? withDefaults(id), `${BASE}/opencode-go/v1`)), "oc-go")),
+		models: ocgIds.map((id) => tagName(toConfig(retarget(ocgRegistry[id] ?? withDefaults(id), openaiBase("opencode-go"))), "oc-go")),
 	});
 
 	pi.registerProvider("command-code", {
 		name: "exe command-code",
-		baseUrl: `${BASE}/command-code/v1`,
+		baseUrl: openaiBase("command-code"),
 		apiKey: API_KEY,
 		headers: EXTRA_HEADERS,
 		api: "openai-completions",
 		models: COMMAND_CODE_IDS.map((id) =>
-			tagName(toConfig(retarget(resolveModel(id, ...registries), `${BASE}/command-code/v1`)), "cmd"),
+			tagName(toConfig(retarget(resolveModel(id, ...registries), openaiBase("command-code"))), "cmd"),
 		),
 	});
 
 	pi.registerProvider("command-code-anthropic", {
 		name: "exe command-code (anthropic)",
-		baseUrl: `${BASE}/command-code`,
+		baseUrl: anthropicBase("command-code"),
 		apiKey: API_KEY,
 		headers: EXTRA_HEADERS,
 		api: "anthropic-messages",
 		models: COMMAND_CODE_ANTHROPIC_IDS.map((id) =>
-			tagName(toConfig(retarget(resolveModel(id, ...registries), `${BASE}/command-code`)), "cmd-claude"),
+			tagName(toConfig(retarget(resolveModel(id, ...registries), anthropicBase("command-code"))), "cmd-claude"),
 		),
 	});
 
 	pi.registerProvider("kimi-coding", {
 		name: "exe kimi-coding",
-		baseUrl: `${BASE}/kimi-code`,
+		baseUrl: anthropicBase("kimi-code"),
 		apiKey: API_KEY,
 		headers: EXTRA_HEADERS,
 		api: "anthropic-messages",
-		models: KIMI_IDS.map((id) => tagName(toConfig(retarget(registries[3][id] ?? resolveModel(id, ...registries), `${BASE}/kimi-code`)), "kimi")),
+		models: KIMI_IDS.map((id) => tagName(toConfig(retarget(registries[3][id] ?? resolveModel(id, ...registries), anthropicBase("kimi-code"))), "kimi")),
 	});
 }
