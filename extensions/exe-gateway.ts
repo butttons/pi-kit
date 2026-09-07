@@ -20,8 +20,16 @@ import { dirname, join } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
-const BASE = "https://llm.int.exe.xyz";
-const KEYLESS = "exe-keyless"; // gateway injects auth; pi just needs a non-empty key
+const DEFAULT_BASE = "https://llm.int.exe.xyz";
+// Env overrides (mwt-paseo sets these to route through the reef recorder):
+//   EXE_GATEWAY_BASE=https://reef.int.exe.xyz  — proxy base (default: direct gateway)
+//   REEF_TOKEN=reef-local                      — reef service credential (default: keyless)
+//   REEF_SCENARIO=pi-daily                     — required x-reef-scenario header when behind reef
+const BASE = process.env.EXE_GATEWAY_BASE ?? DEFAULT_BASE;
+const API_KEY = process.env.REEF_TOKEN ?? "exe-keyless"; // gateway injects auth; pi just needs a non-empty key
+const EXTRA_HEADERS: Record<string, string> = process.env.REEF_SCENARIO
+	? { "x-reef-scenario": process.env.REEF_SCENARIO }
+	: {};
 
 type RegistryModel = {
 	id: string;
@@ -331,7 +339,8 @@ export default async function (pi: ExtensionAPI) {
 	pi.registerProvider("opencode-go", {
 		name: "exe opencode-go",
 		baseUrl: `${BASE}/opencode-go/v1`,
-		apiKey: KEYLESS,
+		apiKey: API_KEY,
+		headers: EXTRA_HEADERS,
 		api: "openai-completions",
 		models: ocgIds.map((id) => tagName(toConfig(retarget(ocgRegistry[id] ?? withDefaults(id), `${BASE}/opencode-go/v1`)), "oc-go")),
 	});
@@ -339,7 +348,8 @@ export default async function (pi: ExtensionAPI) {
 	pi.registerProvider("command-code", {
 		name: "exe command-code",
 		baseUrl: `${BASE}/command-code/v1`,
-		apiKey: KEYLESS,
+		apiKey: API_KEY,
+		headers: EXTRA_HEADERS,
 		api: "openai-completions",
 		models: COMMAND_CODE_IDS.map((id) =>
 			tagName(toConfig(retarget(resolveModel(id, ...registries), `${BASE}/command-code/v1`)), "cmd"),
@@ -349,7 +359,8 @@ export default async function (pi: ExtensionAPI) {
 	pi.registerProvider("command-code-anthropic", {
 		name: "exe command-code (anthropic)",
 		baseUrl: `${BASE}/command-code`,
-		apiKey: KEYLESS,
+		apiKey: API_KEY,
+		headers: EXTRA_HEADERS,
 		api: "anthropic-messages",
 		models: COMMAND_CODE_ANTHROPIC_IDS.map((id) =>
 			tagName(toConfig(retarget(resolveModel(id, ...registries), `${BASE}/command-code`)), "cmd-claude"),
@@ -359,7 +370,8 @@ export default async function (pi: ExtensionAPI) {
 	pi.registerProvider("kimi-coding", {
 		name: "exe kimi-coding",
 		baseUrl: `${BASE}/kimi-code`,
-		apiKey: KEYLESS,
+		apiKey: API_KEY,
+		headers: EXTRA_HEADERS,
 		api: "anthropic-messages",
 		models: KIMI_IDS.map((id) => tagName(toConfig(retarget(registries[3][id] ?? resolveModel(id, ...registries), `${BASE}/kimi-code`)), "kimi")),
 	});
