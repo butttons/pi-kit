@@ -39,6 +39,11 @@ const EXTRA_HEADERS: Record<string, string> = process.env.REEF_SCENARIO
 	? { "x-reef-scenario": process.env.REEF_SCENARIO }
 	: {};
 
+// opencode-go models that do NOT speak chat/completions (opencode.ai/docs/go
+// endpoints table, 2026-09-09). Everything else on the lane is chat/completions.
+const RESPONSES_API_IDS = new Set(["grok-4.6", "gpt-5.6-luna", "muse-spark-1.3-contributor", "muse-spark-1.2-contributor"]);
+const ANTHROPIC_API_IDS = new Set(["minimax-m3", "minimax-m2.7", "minimax-m2.5", "qwen3.8-max", "qwen3.8-flash", "qwen3.7-max", "qwen3.7-plus", "qwen3.6-plus"]);
+
 type RegistryModel = {
 	id: string;
 	name?: string;
@@ -359,10 +364,14 @@ export default async function (pi: ExtensionAPI) {
 		apiKey: API_KEY,
 		headers: EXTRA_HEADERS,
 		api: "openai-completions",
-		models: ocgIds.map((id) => ({
-			...tagName(toConfig(retarget(ocgRegistry[id] ?? withDefaults(id), openaiBase("opencode-go"))), "oc-go"),
-			headers: { "x-opencode-session": ocgSession },
-		})),
+		models: ocgIds.map((id) => {
+			const model = tagName(toConfig(retarget(ocgRegistry[id] ?? withDefaults(id), openaiBase("opencode-go"))), "oc-go");
+			// Per-model API lanes per opencode.ai/docs/go (2026-09-09).
+			// Default (absent) = chat/completions, which is what this provider declares.
+			if (RESPONSES_API_IDS.has(id)) model.api = "openai-responses";
+			else if (ANTHROPIC_API_IDS.has(id)) model.api = "anthropic-messages";
+			return { ...model, headers: { "x-opencode-session": ocgSession } };
+		}),
 	});
 
 	pi.registerProvider("command-code", {
