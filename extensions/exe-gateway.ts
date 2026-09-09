@@ -372,7 +372,7 @@ export default async function (pi: ExtensionAPI) {
 			else if (ANTHROPIC_API_IDS.has(id)) model.api = "anthropic-messages";
 			// Console Go's upstream rejects the `developer` role (SiliconFlow
 			// [1214] "Incorrect role information", intermittent 2026-09-09).
-			model.compat = { ...model.compat, supportsDeveloperRole: false };
+			model.compat = { ...model.compat, supportsDeveloperRole: false, supportsReasoningEffort: false };
 			return { ...model, headers: { "x-opencode-session": ocgSession } };
 		}),
 	});
