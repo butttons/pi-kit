@@ -14,6 +14,7 @@
 // changes reasoning output; thinking streams via the `reasoning` field.
 // command-code Claude models are plan-gated upstream (MODEL_NOT_IN_PLAN
 // until the exe command-code plan includes them); registered anyway.
+import { randomUUID } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -349,13 +350,19 @@ export default async function (pi: ExtensionAPI) {
 	const ocgRegistry = registries[0];
 
 	const ocgIds = liveIds ?? Object.keys(ocgRegistry);
+	// Console Go routes by x-opencode-session and 400s (MissingSessionID)
+	// without it (verified 2026-09-09). One stable id per pi process is enough.
+	const ocgSession = randomUUID();
 	pi.registerProvider("opencode-go", {
 		name: "exe opencode-go",
 		baseUrl: openaiBase("opencode-go"),
 		apiKey: API_KEY,
 		headers: EXTRA_HEADERS,
 		api: "openai-completions",
-		models: ocgIds.map((id) => tagName(toConfig(retarget(ocgRegistry[id] ?? withDefaults(id), openaiBase("opencode-go"))), "oc-go")),
+		models: ocgIds.map((id) => ({
+			...tagName(toConfig(retarget(ocgRegistry[id] ?? withDefaults(id), openaiBase("opencode-go"))), "oc-go"),
+			headers: { "x-opencode-session": ocgSession },
+		})),
 	});
 
 	pi.registerProvider("command-code", {
