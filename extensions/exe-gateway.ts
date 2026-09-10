@@ -333,9 +333,18 @@ const COMMAND_CODE_ANTHROPIC_IDS = [
 
 const KIMI_IDS = ["kimi-for-coding", "kimi-for-coding-highspeed", "k3", "k3-256k"]; // verified via /kimi-code/v1/messages + models.json 2026-09-10
 
+// ChatGPT subscription lane (exe integration mode=chatgpt). The upstream is
+// the Codex backend: responses API only, requires store:false + stream:true +
+// structured list input — pi's "openai-codex-responses" API speaks exactly
+// this. The lane's /models lists 29 ids but the backend rejects everything
+// except the current codex-generation models (probed one-by-one 2026-09-10:
+// gpt-5.4-mini/gpt-5.3-codex/o3/o4-mini/... all "not supported when using
+// Codex with a ChatGPT account"), so the list is static.
+const CHATGPT_IDS = ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"];
+
 // Poolside serves exactly two models and demands the double-prefixed id
 // verbatim ("poolside/laguna-s-2.1" -> "please check the model").
-const POOLSIDE_IDS = ["poolside/laguna-s-2.1", "poolside/laguna-xs-2.1"];
+const POOLSIDE_IDS = ["poolside/poolside/laguna-s-2.1", "poolside/poolside/laguna-xs-2.1"];
 
 // zai lane deliberately NOT registered: the exe integration points at the
 // chat-completions base (paas/v4) where the GLM Coding Plan key has no
@@ -372,7 +381,7 @@ async function fetchOpenrouterModels(): Promise<Map<string, number> | null> {
 export default async function (pi: ExtensionAPI) {
 	// Registries consulted for capability metadata. Models are provider-agnostic
 	// (same weights on every lane), so native registries are valid references.
-	const [registries, liveIds, chatgptIds, openrouterModels] = await Promise.all([
+	const [registries, liveIds, openrouterModels] = await Promise.all([
 		Promise.all([
 			loadRegistry("opencode-go", "openai-completions"),
 			loadRegistry("zai", "openai-completions"),
@@ -384,9 +393,9 @@ export default async function (pi: ExtensionAPI) {
 			loadRegistry("nvidia", "openai-completions"),
 			loadRegistry("minimax", "anthropic-messages"),
 			loadRegistry("openai", "openai-responses"),
+			loadRegistry("openai-codex", "openai-codex-responses"),
 		]).then((rs) => rs.flat()),
 		fetchOpencodeGoIds(),
-		fetchLaneIds("openai"),
 		fetchOpenrouterModels(),
 	]);
 
@@ -446,20 +455,17 @@ export default async function (pi: ExtensionAPI) {
 		models: KIMI_IDS.map((id) => tagName(toConfig(retarget(registries[3][id] ?? resolveModel(id, ...registries), anthropicBase("kimi-code"))), "kimi")),
 	});
 
-	// ChatGPT subscription lane (exe integration mode=chatgpt). Responses
-	// API only per /models.json (2026-09-10) — chat/completions is rejected.
-	if (chatgptIds) {
-		pi.registerProvider("chatgpt", {
-			name: "exe chatgpt",
-			baseUrl: openaiBase("openai"),
-			apiKey: API_KEY,
-			headers: EXTRA_HEADERS,
-			api: "openai-responses",
-			models: chatgptIds.map((id) =>
-				tagName(toConfig(retarget(resolveModel(id, ...registries), openaiBase("openai"))), "gpt"),
-			),
-		});
-	}
+	// ChatGPT subscription lane (see CHATGPT_IDS for why static + codex API).
+	pi.registerProvider("chatgpt", {
+		name: "exe chatgpt",
+		baseUrl: openaiBase("openai"),
+		apiKey: API_KEY,
+		headers: EXTRA_HEADERS,
+		api: "openai-codex-responses",
+		models: CHATGPT_IDS.map((id) =>
+			tagName(toConfig(retarget(resolveModel(id, ...registries), openaiBase("openai"))), "gpt"),
+		),
+	});
 
 	// OpenRouter BYOK lane. 400+ models; context windows from the live
 	// /models payload, capabilities from the registry resolvers.
