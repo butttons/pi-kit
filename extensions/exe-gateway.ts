@@ -331,13 +331,44 @@ const COMMAND_CODE_ANTHROPIC_IDS = [
 	"claude-haiku-4-5",
 ];
 
-const KIMI_IDS = ["kimi-for-coding", "k3", "k3-256k"]; // verified via /kimi-code/v1/messages
+const KIMI_IDS = ["kimi-for-coding", "kimi-for-coding-highspeed", "k3", "k3-256k"]; // verified via /kimi-code/v1/messages + models.json 2026-09-10
+
+// Poolside serves exactly two models and demands the double-prefixed id
+// verbatim ("poolside/laguna-s-2.1" -> "please check the model").
+const POOLSIDE_IDS = ["poolside/laguna-s-2.1", "poolside/laguna-xs-2.1"];
+
+// zai lane deliberately NOT registered: the exe integration points at the
+// chat-completions base (paas/v4) where the GLM Coding Plan key has no
+// entitlements (model_access_denied on every model, 2026-09-10), and the
+// lane's base_url is not patchable. GLM models are available via the
+// opencode-go and command-code lanes anyway.
+
+// Fetch live id lists from gateway lanes that serve /models.
+// ChatGPT (openai lane) and openrouter both do; ids may carry the lane prefix.
+async function fetchLaneIds(lane: string): Promise<string[] | null> {
+	return fetchIds(`${openaiBase(lane)}/models`, new RegExp(`^${lane}/`));
+}
+
+// openrouter's /models includes per-model context_length — use it, since
+// most openrouter ids have no pi-registry metadata and withDefaults would
+// otherwise claim a 1M window.
+async function fetchOpenrouterModels(): Promise<Map<string, number> | null> {
+	try {
+		const res = await fetch(`${openaiBase("openrouter")}/models`);
+		const data = (await res.json()) as { data?: { id: string; context_length?: number }[] };
+		const map = new Map<string, number>();
+		for (const m of data.data ?? []) map.set(m.id.replace(/^openrouter\//, ""), m.context_length ?? 0);
+		return map.size > 0 ? map : null;
+	} catch {
+		return null;
+	}
+}
 // =========================================================================
 
 export default async function (pi: ExtensionAPI) {
 	// Registries consulted for capability metadata. Models are provider-agnostic
 	// (same weights on every lane), so native registries are valid references.
-	const [registries, liveIds] = await Promise.all([
+	const [registries, liveIds, chatgptIds, openrouterModels] = await Promise.all([
 		Promise.all([
 			loadRegistry("opencode-go", "openai-completions"),
 			loadRegistry("zai", "openai-completions"),
@@ -348,8 +379,11 @@ export default async function (pi: ExtensionAPI) {
 			loadRegistry("moonshotai", "openai-completions"),
 			loadRegistry("nvidia", "openai-completions"),
 			loadRegistry("minimax", "anthropic-messages"),
+			loadRegistry("openai", "openai-responses"),
 		]).then((rs) => rs.flat()),
 		fetchOpencodeGoIds(),
+		fetchLaneIds("openai"),
+		fetchOpenrouterModels(),
 	]);
 
 	const ocgRegistry = registries[0];
@@ -406,5 +440,49 @@ export default async function (pi: ExtensionAPI) {
 		headers: EXTRA_HEADERS,
 		api: "anthropic-messages",
 		models: KIMI_IDS.map((id) => tagName(toConfig(retarget(registries[3][id] ?? resolveModel(id, ...registries), anthropicBase("kimi-code"))), "kimi")),
+	});
+
+	// ChatGPT subscription lane (exe integration mode=chatgpt). Responses
+	// API only per /models.json (2026-09-10) — chat/completions is rejected.
+	if (chatgptIds) {
+		pi.registerProvider("chatgpt", {
+			name: "exe chatgpt",
+			baseUrl: openaiBase("openai"),
+			apiKey: API_KEY,
+			headers: EXTRA_HEADERS,
+			api: "openai-responses",
+			models: chatgptIds.map((id) =>
+				tagName(toConfig(retarget(resolveModel(id, ...registries), openaiBase("openai"))), "gpt"),
+			),
+		});
+	}
+
+	// OpenRouter BYOK lane. 400+ models; context windows from the live
+	// /models payload, capabilities from the registry resolvers.
+	if (openrouterModels) {
+		pi.registerProvider("openrouter", {
+			name: "exe openrouter",
+			baseUrl: openaiBase("openrouter"),
+			apiKey: API_KEY,
+			headers: EXTRA_HEADERS,
+			api: "openai-completions",
+			models: [...openrouterModels.keys()].map((id) => {
+				const model = tagName(toConfig(retarget(resolveModel(id, ...registries), openaiBase("openrouter"))), "or");
+				const ctx = openrouterModels.get(id);
+				if (ctx) model.contextWindow = ctx;
+				return model;
+			}),
+		});
+	}
+
+	pi.registerProvider("poolside", {
+		name: "exe poolside",
+		baseUrl: openaiBase("poolside"),
+		apiKey: API_KEY,
+		headers: EXTRA_HEADERS,
+		api: "openai-completions",
+		models: POOLSIDE_IDS.map((id) =>
+			tagName(toConfig(retarget(resolveModel(id, ...registries), openaiBase("poolside"))), "pool"),
+		),
 	});
 }
