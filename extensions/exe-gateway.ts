@@ -345,8 +345,12 @@ const POOLSIDE_IDS = ["poolside/laguna-s-2.1", "poolside/laguna-xs-2.1"];
 
 // Fetch live id lists from gateway lanes that serve /models.
 // ChatGPT (openai lane) and openrouter both do; ids may carry the lane prefix.
+// Dedupe after stripping: the openai lane lists every model twice
+// ("openai/gpt-5.6-sol" AND "gpt-5.6-sol"), which otherwise crashes
+// consumers with duplicate model ids (paseo Command Center, 2026-09-10).
 async function fetchLaneIds(lane: string): Promise<string[] | null> {
-	return fetchIds(`${openaiBase(lane)}/models`, new RegExp(`^${lane}/`));
+	const ids = await fetchIds(`${openaiBase(lane)}/models`, new RegExp(`^${lane}/`));
+	return ids ? [...new Set(ids)] : null;
 }
 
 // openrouter's /models includes per-model context_length — use it, since
