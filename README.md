@@ -61,7 +61,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | ---------------------- | -------------------------------------------------------------------------------------------------------- |
 | **plan-mode**          | `/plan` read-only exploration mode with step extraction and progress tracking. `Ctrl+Alt+P` to toggle. Uses `dora` if available. |
 | **handoff**            | `/handoff` command to transfer context to a new focused session.                                         |
-| **session-recall**     | `/recall <query>` searches past sessions using a TOON-formatted index. `--compact` for a slimmer index.  |
+| **session-recall**     | Search past sessions: `/recall [--compact] [--all] <query>` with a TOON-formatted index, plus `list_sessions` (paginated/filtered listing) and `search_sessions` (full-text) tools. Cross-project with scope="all" / `--all`. |
 | **shell-preprocessor** | Expand `` $`command` `` in prompts before the agent sees them.                                           |
 | **agent-watch**        | Periodically scans subagent activity files and injects status messages (turn index, activity, stall counter) so the orchestrator can see which agents are progressing. |
 
