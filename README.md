@@ -80,6 +80,7 @@ After install, run `pi config` to enable/disable individual resources from the T
 | **opencode-usage** | `/usage` command that queries the opencode go usage endpoint (rolling/weekly/monthly). Uses the `opencode-go` provider key from pi auth.                                |
 | **command-code**   | Registers the [Command Code](https://commandcode.ai/provider) provider API: live-fetches the model list and exposes it as `command-code` (OpenAI-compatible) and `command-code-anthropic` (Claude models). Uses the `command-code` key from pi auth. |
 | **poolside**       | Registers the [Poolside](https://poolside.ai) inference API as the `poolside` provider (OpenAI-compatible). Live model list; uses the `poolside` key from pi auth.      |
+| **wakatime**       | Time tracking via the [WakaTime](https://wakatime.com) HTTPS API (no CLI binary). `/wakatime login [key] \| logout \| status`; auto-sends heartbeats (`ai coding` category) on edit/write/read with lowercase `org/repo` project identity. Key in `~/.pi/agent/wakatime.json` or `WAKATIME_API_KEY`. |
 
 ## Skills
 
