@@ -16,6 +16,12 @@
  * The get_folded_message tool lets the LLM retrieve any folded content on
  * demand.
  *
+ * pi core (1.x) triggers threshold auto-compaction over the FULL session
+ * projection, ignoring this extension's context filter. This extension
+ * therefore cancels threshold-triggered compaction while the post-fold
+ * (LLM-visible) context still fits, so a /fold isn't immediately followed
+ * by a redundant provider-side-style compaction.
+ *
  * Caching: the /fold command only affects the context event filter. When no
  * fold markers are present, the context event passes through unchanged, so
  * provider-side caching is unaffected. Caching is only busted when the LLM
@@ -32,6 +38,7 @@ import type {
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
 	truncateTail,
+	estimateTokens,
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
 } from "@earendil-works/pi-coding-agent";
@@ -265,6 +272,55 @@ function formatFoldedMessage(msg: FoldedMessage): string {
 	return out;
 }
 
+/**
+ * Rough token estimate for a session entry, mirroring pi core's chars/4
+ * heuristic (via estimateTokens). Used to judge whether the post-fold
+ * (LLM-visible) context is actually over the compaction threshold.
+ */
+function estimateEntryTokens(entry: {
+	type: string;
+	message?: AgentMessage;
+	content?: unknown;
+	summary?: string;
+}): number {
+	try {
+		if (entry.type === "message" && entry.message) {
+			return estimateTokens(entry.message);
+	}
+	if (entry.type === "custom_message") {
+		return estimateTokens({
+			role: "custom",
+			content: entry.content ?? "",
+		} as unknown as AgentMessage);
+	}
+	if (entry.type === "compaction" && typeof entry.summary === "string") {
+		return estimateTokens({
+			role: "compactionSummary",
+			summary: entry.summary,
+		} as unknown as AgentMessage);
+	}
+	} catch {
+		// Fall through to 0 on unexpected shapes.
+	}
+	return 0;
+}
+
+/** Find the index of the latest fold-marker in a session entry branch. */
+function findLatestFoldMarkerEntry(
+	branch: Array<{ type: string; customType?: string }>,
+): number {
+	let latest = -1;
+	for (let i = 0; i < branch.length; i++) {
+		if (
+			branch[i].type === "custom_message" &&
+			branch[i].customType === FOLD_MARKER_TYPE
+		) {
+			latest = i;
+		}
+	}
+	return latest;
+}
+
 // --- Extension ---
 
 export default function foldExtension(pi: ExtensionAPI): void {
@@ -297,6 +353,53 @@ export default function foldExtension(pi: ExtensionAPI): void {
 		} else {
 			ctx.ui.setStatus("fold", undefined);
 		}
+	});
+
+	// --- Make pi core's auto-compaction fold-aware ---
+	// pi core computes its threshold/overflow triggers over the FULL session
+	// projection, ignoring this extension's `context` filter. Without this
+	// hook, pi auto-compacts right after (or despite) a /fold, summarizing
+	// messages the user already folded and orphaning the fold entries from
+	// the LLM-visible context. Threshold compaction is spurious while the
+	// post-fold (actually LLM-visible) context fits, so cancel it. Overflow
+	// and manual compactions are never cancelled: overflow means the provider
+	// really rejected the request, and manual means explicit user intent.
+
+	pi.on("session_before_compact", async (event, ctx) => {
+		if (event.reason !== "threshold") return;
+
+		const markerIndex = findLatestFoldMarkerEntry(event.branchEntries);
+		if (markerIndex === -1) return; // no fold active — nothing to protect
+
+		let visibleTokens = 0;
+		for (let i = markerIndex; i < event.branchEntries.length; i++) {
+			visibleTokens += estimateEntryTokens(
+			event.branchEntries[i] as {
+				type: string;
+				message?: AgentMessage;
+				content?: unknown;
+				summary?: string;
+			},
+		);
+		}
+
+		const { reserveTokens, keepRecentTokens } = event.preparation.settings;
+		const contextWindow = ctx.model?.contextWindow ?? 0;
+		const needsCompact =
+			contextWindow > 0
+				? visibleTokens > contextWindow - reserveTokens
+				: visibleTokens > keepRecentTokens;
+
+		if (!needsCompact) {
+			ctx.ui.notify(
+				`Skipped auto-compaction — /fold already holds LLM context to ~${visibleTokens} tokens.`,
+				"info",
+			);
+			return { cancel: true };
+		}
+		// Post-fold context is genuinely over threshold: allow compaction.
+		// Fold entries stay on disk (getBranch still sees them), so
+		// search_folded / get_folded_message keep working afterwards.
 	});
 
 	// --- Filter folded messages from LLM context ---
